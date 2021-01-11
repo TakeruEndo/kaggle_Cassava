@@ -1,9 +1,13 @@
+import sys
+import os
 import numpy as np
 
 import cv2
 import torch
 from torch.utils.data import Dataset
 
+sys.path.append('../../../FMix_master')
+sys.path.append('FMix_master')
 from fmix import sample_mask, make_low_freq_image, binarise_mask
 
 

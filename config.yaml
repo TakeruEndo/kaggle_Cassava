@@ -11,8 +11,8 @@ default:
   model_arch: 'tf_efficientnet_b4_ns'
   img_size: 512
   epochs: 10
-  train_bs: 16
-  valid_bs: 32
+  train_bs: 8 
+  valid_bs: 8
   T_0: 10
   lr: 1e-4
   min_lr: 1e-6
@@ -23,8 +23,8 @@ default:
 inf:
   fold_num: 5
   seed: 719
-  train_bs: 32
-  valid_bs: 32
+  train_bs: 8
+  valid_bs: 8
   lr: 1e-4
   num_workers: 4
   accum_iter: 1 # suppoprt to do batch accumulation for backprop with effectively larger batch size

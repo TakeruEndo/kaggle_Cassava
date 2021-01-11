@@ -4,8 +4,11 @@ import time
 import random
 from glob import glob
 import warnings
+import logging
+warnings.simplefilter('ignore')
 from datetime import datetime
 import joblib
+import shutil
 
 import cv2
 import pandas as pd
@@ -26,6 +29,7 @@ from torch.utils.data import Dataset, DataLoader
 from torch.utils.data.sampler import SequentialSampler, RandomSampler
 from torch.cuda.amp import autocast, GradScaler
 import torch.nn.functional as F
+from torch.utils.tensorboard import SummaryWriter
 
 import timm
 #from efficientnet_pytorch import EfficientNet
@@ -35,7 +39,6 @@ from catalyst.data.sampler import BalanceClassSampler
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-sys.path.append('FMix-master')
 from Model import efficientnet
 from dataset import CassavaDataset
 from transform import get_train_transforms, get_valid_transforms
@@ -71,15 +74,21 @@ def prepare_dataloader(cfg, df, trn_idx, val_idx, data_root='../input/cassava-le
     return train_loader, val_loader
 
 
-def train_one_epoch(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device, scheduler=None, schd_batch_update=False):
+def train_one_epoch(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device, writer, scheduler=None, schd_batch_update=False):
     model.train()
 
     running_loss = None
+    loss_sum = 0
+    sample_num = 0
 
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
     for step, (imgs, image_labels) in pbar:
         imgs = imgs.to(device).float()
         image_labels = image_labels.to(device).long()
+
+        if epoch == 0 and step == 0:
+            grid = torchvision.utils.make_grid(imgs)
+            writer.add_image('train_images', grid, 0)
 
         # print(image_labels.shape, exam_label.shape)
         with autocast():
@@ -90,6 +99,8 @@ def train_one_epoch(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler,
 
             scaler.scale(loss).backward()
 
+            sample_num += image_labels.shape[0]
+            loss_sum += loss.item() * image_labels.shape[0]
             if running_loss is None:
                 running_loss = loss.item()
             else:
@@ -109,12 +120,12 @@ def train_one_epoch(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler,
                 description = f'epoch {epoch} loss: {running_loss:.4f}'
 
                 pbar.set_description(description)
-
+    writer.add_scalar('train_loss', loss_sum/sample_num, epoch)
     if scheduler is not None and not schd_batch_update:
         scheduler.step()
 
 
-def valid_one_epoch(cfg, epoch, model, loss_fn, val_loader, device, scheduler=None, schd_loss_update=False):
+def valid_one_epoch(cfg, epoch, model, loss_fn, val_loader, device, writer, logging, scheduler=None, schd_loss_update=False):
     model.eval()
 
     loss_sum = 0
@@ -144,9 +155,12 @@ def valid_one_epoch(cfg, epoch, model, loss_fn, val_loader, device, scheduler=No
 
     image_preds_all = np.concatenate(image_preds_all)
     image_targets_all = np.concatenate(image_targets_all)
+    logging.info('validation multi-class accuracy = {:.4f}'.format(
+        (image_preds_all == image_targets_all).mean()))
     print('validation multi-class accuracy = {:.4f}'.format(
         (image_preds_all == image_targets_all).mean()))
 
+    writer.add_scalar('valid_loss', loss_sum/sample_num, epoch)
     if scheduler is not None:
         if schd_loss_update:
             scheduler.step(loss_sum / sample_num)
@@ -156,17 +170,21 @@ def valid_one_epoch(cfg, epoch, model, loss_fn, val_loader, device, scheduler=No
 
 @hydra.main(config_name='config')
 def main(cfg):
-    train = pd.read_csv(cfg.common.train_path)
+    logging.basicConfig(filename='logger.log', level=logging.INFO)
+    writer = SummaryWriter(log_dir='./logs')
 
+    train = pd.read_csv(cfg.common.train_path)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     print('device:', device)
-
     seed_everything(cfg.default.seed)
+
+    shutil.copyfile('../../../transform.py', os.path.join(os.getcwd(), 'transform.py'))
 
     folds = StratifiedKFold(
         n_splits=cfg.default.fold_num, shuffle=True, random_state=cfg.default.seed).split(np.arange(train.shape[0]), train.label.values)
 
     for fold, (trn_idx, val_idx) in enumerate(folds):
+        logging.info(f'Start_{fold}fold')
         # we'll train fold 0 first
         if fold > 0:
             break
@@ -200,15 +218,17 @@ def main(cfg):
 
         for epoch in range(cfg.default.epochs):
             train_one_epoch(cfg, epoch, model, loss_tr, optimizer, train_loader,
-                            scaler, device, scheduler=scheduler, schd_batch_update=False)
+                            scaler, device, writer, scheduler=scheduler, schd_batch_update=False)
             with torch.no_grad():
                 valid_one_epoch(cfg, epoch, model, loss_fn, val_loader,
-                                device, scheduler=None, schd_loss_update=False)
+                                device, writer, logging, scheduler=None, schd_loss_update=False)
             torch.save(model.state_dict(),
                        f'{cfg.default.model_arch}_fold_{fold}_{epoch}')
         # torch.save(model.cnn_model.state_dict(),'{}/cnn_model_fold_{}_{}'.format(CFG['model_path'], fold, CFG['tag']))
         del model, optimizer, train_loader, val_loader, scaler, scheduler
         torch.cuda.empty_cache()
+    writer.close()
+
 
 
 if __name__ == '__main__':
