@@ -42,7 +42,7 @@ from omegaconf import DictConfig, OmegaConf
 from Model import efficientnet
 from dataset import CassavaDataset
 from transform import get_train_transforms, get_valid_transforms
-from utils import seed_everything
+from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score
 
 
 def prepare_dataloader(cfg, df, trn_idx, val_idx, data_root='../input/cassava-leaf-disease-classification/train_images/'):
@@ -74,12 +74,11 @@ def prepare_dataloader(cfg, df, trn_idx, val_idx, data_root='../input/cassava-le
     return train_loader, val_loader
 
 
-def train_one_epoch(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device, writer, scheduler=None, schd_batch_update=False):
+def train_fn(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device, writer, scheduler=None, schd_batch_update=False):
     model.train()
 
     running_loss = None
-    loss_sum = 0
-    sample_num = 0
+    losses = AverageMeter()
 
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
     for step, (imgs, image_labels) in pbar:
@@ -90,46 +89,33 @@ def train_one_epoch(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler,
             grid = torchvision.utils.make_grid(imgs)
             writer.add_image('train_images', grid, 0)
 
-        # print(image_labels.shape, exam_label.shape)
         with autocast():
-            image_preds = model(imgs)  # output = model(input)
-            # print(image_preds.shape, exam_pred.shape)
+            y_preds = model(imgs)  # output = model(input)
 
-            loss = loss_fn(image_preds, image_labels)
-
+            loss = loss_fn(y_preds, image_labels)
+            losses.update(loss.item(), cfg.default.train_bs)
             scaler.scale(loss).backward()
-
-            sample_num += image_labels.shape[0]
-            loss_sum += loss.item() * image_labels.shape[0]
-            if running_loss is None:
-                running_loss = loss.item()
-            else:
-                running_loss = running_loss * .99 + loss.item() * .01
 
             if ((step + 1) % cfg.default.accum_iter == 0) or ((step + 1) == len(train_loader)):
                 # may unscale_ here if desired (e.g., to allow clipping unscaled gradients)
-
                 scaler.step(optimizer)
                 scaler.update()
                 optimizer.zero_grad()
-
                 if scheduler is not None and schd_batch_update:
                     scheduler.step()
-
             if ((step + 1) % cfg.default.verbose_step == 0) or ((step + 1) == len(train_loader)):
                 description = f'epoch {epoch} loss: {running_loss:.4f}'
-
                 pbar.set_description(description)
-    writer.add_scalar('train_loss', loss_sum/sample_num, epoch)
+
     if scheduler is not None and not schd_batch_update:
         scheduler.step()
 
+    return losses.avg
 
-def valid_one_epoch(cfg, epoch, model, loss_fn, val_loader, device, writer, logging, scheduler=None, schd_loss_update=False):
+
+def valid_fn(cfg, epoch, model, loss_fn, val_loader, device, writer, logger, scheduler=None, schd_loss_update=False):
     model.eval()
-
-    loss_sum = 0
-    sample_num = 0
+    losses = AverageMeter()
     image_preds_all = []
     image_targets_all = []
 
@@ -140,37 +126,33 @@ def valid_one_epoch(cfg, epoch, model, loss_fn, val_loader, device, writer, logg
 
         image_preds = model(imgs)  # output = model(input)
         # print(image_preds.shape, exam_pred.shape)
-        image_preds_all += [torch.argmax(image_preds,
-                                         1).detach().cpu().numpy()]
+        image_preds_all += [torch.argmax(image_preds, 1).detach().cpu().numpy()]
         image_targets_all += [image_labels.detach().cpu().numpy()]
 
         loss = loss_fn(image_preds, image_labels)
-
-        loss_sum += loss.item() * image_labels.shape[0]
-        sample_num += image_labels.shape[0]
+        losses.update(loss.item(), cfg.default.valid_bs)
 
         if ((step + 1) % cfg.default.verbose_step == 0) or ((step + 1) == len(val_loader)):
-            description = f'epoch {epoch} loss: {loss_sum/sample_num:.4f}'
+            description = f'epoch {epoch} loss: {losses.avg:.4f}'
             pbar.set_description(description)
 
     image_preds_all = np.concatenate(image_preds_all)
     image_targets_all = np.concatenate(image_targets_all)
-    logging.info('validation multi-class accuracy = {:.4f}'.format(
-        (image_preds_all == image_targets_all).mean()))
-    print('validation multi-class accuracy = {:.4f}'.format(
-        (image_preds_all == image_targets_all).mean()))
+    # logger.info('validation multi-class accuracy = {:.4f}'.format(
+    #     (image_preds_all == image_targets_all).mean()))
 
-    writer.add_scalar('valid_loss', loss_sum/sample_num, epoch)
+    # writer.add_scalar('valid_loss', losses.avg, epoch)
     if scheduler is not None:
         if schd_loss_update:
-            scheduler.step(loss_sum / sample_num)
+            scheduler.step(losses.avg)
         else:
             scheduler.step()
+    return losses.avg, image_preds_all, image_targets_all
 
 
 @hydra.main(config_name='config')
 def main(cfg):
-    logging.basicConfig(filename='logger.log', level=logging.INFO)
+    logger = init_logger(os.path.join(os.getcwd(), 'train.log'))
     writer = SummaryWriter(log_dir='./logs')
 
     train = pd.read_csv(cfg.common.train_path)
@@ -183,29 +165,22 @@ def main(cfg):
     folds = StratifiedKFold(
         n_splits=cfg.default.fold_num, shuffle=True, random_state=cfg.default.seed).split(np.arange(train.shape[0]), train.label.values)
 
-    for fold, (trn_idx, val_idx) in enumerate(folds):
-        logging.info(f'Start_{fold}fold')
-        # we'll train fold 0 first
-        if fold > 0:
-            break
+    oof_df = pd.DataFrame()
 
-        print('Training with {} started'.format(fold))
+    for fold, (trn_idx, val_idx) in enumerate(folds):
+        logger.info(f"========== fold: {fold} training ==========")
 
         print(len(trn_idx), len(val_idx))
         train_loader, val_loader = prepare_dataloader(
             cfg, train, trn_idx, val_idx, data_root=cfg.common.img_path)
 
-        model = efficientnet.CustomEfficientNet(
+        model = select_model(
             cfg.default.model_arch, train.label.nunique(), pretrained=True).to(device)
         scaler = GradScaler()
         optimizer = torch.optim.Adam(
             model.parameters(), lr=cfg.default.lr, weight_decay=cfg.default.weight_decay)
 
-        # scheduler = torch.optim.lr_scheduler.StepLR(optimizer, gamma=0.1, step_size=CFG['epochs']-1)
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
-            optimizer, T_0=cfg.default.T_0, T_mult=1, eta_min=cfg.default.min_lr, last_epoch=-1)
-        # scheduler = torch.optim.lr_scheduler.OneCycleLR(optimizer=optimizer, pct_start=0.1, div_factor=25,
-        #                                                max_lr=CFG['lr'], epochs=CFG['epochs'], steps_per_epoch=len(train_loader))
+        scheduler = get_scheduler(cfg, optimizer)
         # ---------------
         # SAMを使いたい
         # ---------------
@@ -216,19 +191,37 @@ def main(cfg):
         loss_tr = nn.CrossEntropyLoss().to(device)  # MyCrossEntropyLoss().to(device)
         loss_fn = nn.CrossEntropyLoss().to(device)
 
+        best_score = 0.
         for epoch in range(cfg.default.epochs):
-            train_one_epoch(cfg, epoch, model, loss_tr, optimizer, train_loader,
-                            scaler, device, writer, scheduler=scheduler, schd_batch_update=False)
+            train_loss = train_fn(
+                cfg, epoch, model, loss_tr, optimizer, train_loader, scaler, device, writer, scheduler=scheduler, schd_batch_update=False)
             with torch.no_grad():
-                valid_one_epoch(cfg, epoch, model, loss_fn, val_loader,
-                                device, writer, logging, scheduler=None, schd_loss_update=False)
-            torch.save(model.state_dict(),
-                       f'{cfg.default.model_arch}_fold_{fold}_{epoch}')
-        # torch.save(model.cnn_model.state_dict(),'{}/cnn_model_fold_{}_{}'.format(CFG['model_path'], fold, CFG['tag']))
+                valid_loss, valid_preds, valid_labels = valid_fn(
+                    cfg, epoch, model, loss_fn, val_loader, device, writer, logger, scheduler=None, schd_loss_update=False)
+            score = get_score(valid_labels, valid_preds)
+            logger.info(f'Epoch {epoch+1} - avg_train_loss: {train_loss:.4f}  avg_val_loss: {valid_loss:.4f}')
+            logger.info(f'Epoch {epoch+1} - Accuracy: {score}')
+            if score > best_score:
+                best_score = score
+                logger.info(f'Epoch {epoch+1} - Save Best Score: {best_score:.4f} Model')
+                torch.save({'model': model.state_dict(), 'preds': valid_preds}, f'{cfg.default.model_arch}_fold{fold}_best.pth')
+            torch.save(model.state_dict(), f'{cfg.default.model_arch}_fold_{fold}_{epoch}')
+
+        check_point = torch.load(f'{cfg.default.model_arch}_fold{fold}_best.pth')
+        _oof_df = check_point['preds']
+        oof_df = pd.concat([oof_df, _oof_df])
+        logger.info(f"========== fold: {fold} result ==========")
+        score = get_score(valid_labels, _oof_df.values)
+        logger.info(f'Score - Accuracy: {score}')
+
         del model, optimizer, train_loader, val_loader, scaler, scheduler
         torch.cuda.empty_cache()
+    
+    logger.info("========== CV ==========")
+    score = get_score(train.label, oof_df.values)
+    oof_df.to_csv('oof_df.csv', index=False)
+    logger.info(f'Score: {score:<.5f}')
     writer.close()
-
 
 
 if __name__ == '__main__':

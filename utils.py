@@ -1,8 +1,13 @@
 import os
 import random
+from logging import getLogger, INFO, FileHandler, Formatter, StreamHandler
 
 import numpy as np
+from sklearn.metrics import accuracy_score
 import torch
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, CosineAnnealingLR, ReduceLROnPlateau
+
+from model.nn_model import *
 
 
 def seed_everything(seed):
@@ -13,3 +18,61 @@ def seed_everything(seed):
     torch.cuda.manual_seed(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = True
+
+
+def init_logger(log_file):
+    logger = getLogger(__name__)
+    logger.setLevel(INFO)
+    handler1 = StreamHandler()
+    handler1.setFormatter(Formatter("%(message)s"))
+    handler2 = FileHandler(filename=log_file)
+    handler2.setFormatter(Formatter("%(message)s"))
+    logger.addHandler(handler1)
+    logger.addHandler(handler2)
+    return logger
+
+
+def select_model(model_name, n_class):
+    if model_name == 'deit_base_patch16_224':
+        model = CustomDeiT(model_name, n_class, pretrained=False)
+    elif model_name == 'vit_base_patch16_384':
+        model = CustomViT(model_name, n_class, pretrained=False)
+    elif model_name == 'resnext50_32x4d':
+        model = CustomResNext(model_name, n_class, pretrained=True)
+    elif model_name == 'tf_efficientnet_b3_ns':
+        model = CustomEfficientNet(model_name, n_class, pretrained=True)
+    return model
+
+
+def get_scheduler(cfg, optimizer):
+    if cfg.shd_para.scheduler_name == 'ReduceLROnPlateau':
+        scheduler = ReduceLROnPlateau(
+            optimizer, mode='min', factor=cfg.shd_para.factor, patience=cfg.shd_para.patience, verbose=True, eps=cfg.shd_para.eps)
+    elif cfg.shd_para.scheduler_name == 'CosineAnnealingLR':
+        scheduler = CosineAnnealingLR(optimizer, T_max=cfg.shd_para.T_max, eta_min=cfg.shd_para.min_lr, last_epoch=-1)
+    elif cfg.shd_para.scheduler_name == 'CosineAnnealingWarmRestarts':
+        scheduler = CosineAnnealingWarmRestarts(
+            optimizer, T_0=cfg.shd_para.T_0, T_mult=1, eta_min=cfg.shd_para.min_lr, last_epoch=-1)
+    return scheduler
+
+
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+
+def get_score(y_true, y_pred):
+    return accuracy_score(y_true, y_pred)

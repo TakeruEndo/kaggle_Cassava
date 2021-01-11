@@ -13,13 +13,19 @@ default:
   epochs: 10
   train_bs: 8 
   valid_bs: 8
-  T_0: 10
-  lr: 1e-4
-  min_lr: 1e-6
   weight_decay: 1e-6
   num_workers: 4
   accum_iter: 2 # suppoprt to do batch accumulation for backprop with effectively larger batch size
   verbose_step: 1
+shd_para:
+  scheduler: 'CosineAnnealingWarmRestarts'
+  factor: 0.2 # ReduceLROnPlateau
+  patience: 4 # ReduceLROnPlateau
+  eps: 1e-6 # ReduceLROnPlateau
+  T_max: 10 # CosineAnnealingLR
+  T_0: 10 # CosineAnnealingWarmRestarts
+  lr: 1e-4
+  min_lr: 1e-6  
 inf:
   fold_num: 5
   seed: 719
