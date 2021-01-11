@@ -1,0 +1,34 @@
+hydra:
+  run:
+    dir: ./outputs/${default.model_arch}/${now:%Y-%m-%d-%H-%M}
+common:
+  train_path: '../../../input/train.csv'
+  submit_path: '../../../input/sample_submission.csv'
+  img_path: '../../../input/train_images'
+default:
+  fold_num: 5
+  seed: 214
+  model_arch: 'tf_efficientnet_b4_ns'
+  img_size: 512
+  epochs: 10
+  train_bs: 16
+  valid_bs: 32
+  T_0: 10
+  lr: 1e-4
+  min_lr: 1e-6
+  weight_decay: 1e-6
+  num_workers: 4
+  accum_iter: 2 # suppoprt to do batch accumulation for backprop with effectively larger batch size
+  verbose_step: 1
+inf:
+  fold_num: 5
+  seed: 719
+  train_bs: 32
+  valid_bs: 32
+  lr: 1e-4
+  num_workers: 4
+  accum_iter: 1 # suppoprt to do batch accumulation for backprop with effectively larger batch size
+  verbose_step: 1
+  tta: 3
+  used_epochs: [6,7,8,9]
+  weights: [1,1,1,1]
