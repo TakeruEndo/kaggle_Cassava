@@ -120,8 +120,7 @@ def train_one_epoch(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler,
                 description = f'epoch {epoch} loss: {running_loss:.4f}'
 
                 pbar.set_description(description)
-
-    writer.add_scaler('train_loss', f'{loss_sum/sample_num:.4f}', epoch)
+    writer.add_scalar('train_loss', loss_sum/sample_num, epoch)
     if scheduler is not None and not schd_batch_update:
         scheduler.step()
 
@@ -161,7 +160,7 @@ def valid_one_epoch(cfg, epoch, model, loss_fn, val_loader, device, writer, logg
     print('validation multi-class accuracy = {:.4f}'.format(
         (image_preds_all == image_targets_all).mean()))
 
-    writer.add_scaler('valid_loss', f'{loss_sum/sample_num:.4f}', epoch)
+    writer.add_scalar('valid_loss', loss_sum/sample_num, epoch)
     if scheduler is not None:
         if schd_loss_update:
             scheduler.step(loss_sum / sample_num)
