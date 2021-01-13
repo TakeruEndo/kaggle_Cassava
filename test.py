@@ -37,7 +37,7 @@ from omegaconf import DictConfig, OmegaConf
 sys.path.append('FMix-master')
 from Model import efficientnet
 from dataset import CassavaDataset
-from transform import get_train_transforms, get_valid_transforms, get_inference_transforms
+from transforms.transform import get_train_transforms, get_valid_transforms, get_inference_transforms
 from utils import seed_everything
 
 

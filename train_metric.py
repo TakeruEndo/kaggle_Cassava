@@ -1,5 +1,5 @@
 from utils import seed_everything
-from transform import get_train_transforms, get_valid_transforms
+from transforms.transform import get_train_transforms, get_valid_transforms
 from dataset import CassavaDataset
 from Model import efficientnet, metric_learning
 import sys

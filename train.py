@@ -40,7 +40,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 from dataset import CassavaDataset
-from transform import get_train_transforms, get_valid_transforms
+from transforms.transform import get_train_transforms, get_valid_transforms
 from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score
 
 
