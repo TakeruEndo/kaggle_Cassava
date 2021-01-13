@@ -1,6 +1,7 @@
 ## [Cassava Leaf Disease Classification](https://www.kaggle.com/c/cassava-leaf-disease-classification)
 
 ## TODO:
+- [ ] [Pseud label learning]
 - [ ] [Meta Pseud Label](https://github.com/TakeruEndo/paper-survey/issues/65)
 
 
