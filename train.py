@@ -32,7 +32,6 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
 import timm
-#from efficientnet_pytorch import EfficientNet
 from scipy.ndimage.interpolation import zoom
 from catalyst.data.sampler import BalanceClassSampler
 
@@ -41,7 +40,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from dataset import CassavaDataset
 from transforms.transform import get_train_transforms, get_valid_transforms
-from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score
+from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score, select_loss
 
 
 def prepare_dataloader(cfg, df, trn_idx, val_idx, data_root='../input/cassava-leaf-disease-classification/train_images/'):
@@ -76,7 +75,6 @@ def prepare_dataloader(cfg, df, trn_idx, val_idx, data_root='../input/cassava-le
 def train_fn(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device, writer, scheduler=None, schd_batch_update=False):
     model.train()
 
-    running_loss = None
     losses = AverageMeter()
 
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
@@ -187,8 +185,8 @@ def main(cfg):
         # optimizer = SAM(model.parameters(), base_optimizer, rho=0.05, lr=0.1, momentum=0.9, weight_decay=0.0005)
         # scheduler = None
 
-        loss_tr = nn.CrossEntropyLoss().to(device)  # MyCrossEntropyLoss().to(device)
-        loss_fn = nn.CrossEntropyLoss().to(device)
+        loss_tr = select_loss(cfg.default.loss_fn).to(device)  # MyCrossEntropyLoss().to(device)
+        loss_fn = select_loss(cfg.default.loss_fn).to(device)
 
         best_score = 0.
         for epoch in range(cfg.default.epochs):

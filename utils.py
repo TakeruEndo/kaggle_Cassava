@@ -6,9 +6,11 @@ from logging import getLogger, INFO, FileHandler, Formatter, StreamHandler
 import numpy as np
 from sklearn.metrics import accuracy_score
 import torch
+from torch import nn
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, CosineAnnealingLR, ReduceLROnPlateau
 
 from model.nn_model import *
+from loss import *
 
 
 def seed_everything(seed):
@@ -48,10 +50,24 @@ def select_model(model_name, n_class):
         model = CustomEfficientNet(model_name, n_class, pretrained=True)
     elif model_name == 'tf_mixnet_s':
         model = CustomEfficientNet(model_name, n_class, pretrained=True)
-    else:        
+    else:
         print('Model arch is not correct')
         sys.exit()
     return model
+
+
+def select_loss(loss_name):
+    if loss_name == 'CrossEntropyLoss':
+        return nn.CrossEntropyLoss()
+    elif loss_name == 'FocalCosineLoss':
+        return FocalCosineLoss()
+    elif loss_name == 'SymmetricCrossEntropy':
+        return SymmetricCrossEntropy()
+    elif loss_name == 'TaylorCrossEntropyLoss':
+        return TaylorCrossEntropyLoss()
+    else:
+        print('Loss name is incorrect')
+        sys.exit()
 
 
 def get_scheduler(cfg, optimizer):
