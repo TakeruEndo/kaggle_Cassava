@@ -1,4 +1,5 @@
 import os
+import sys
 import random
 from logging import getLogger, INFO, FileHandler, Formatter, StreamHandler
 
@@ -39,20 +40,32 @@ def select_model(model_name, n_class):
         model = CustomViT(model_name, n_class, pretrained=False)
     elif model_name == 'resnext50_32x4d':
         model = CustomResNext(model_name, n_class, pretrained=True)
-    elif model_name == 'tf_efficientnet_b3_ns':
+    elif model_name == 'tf_efficientnet_b4_ns':
         model = CustomEfficientNet(model_name, n_class, pretrained=True)
+    elif model_name == 'tf_efficientnet_b5_ns':
+        model = CustomEfficientNet(model_name, n_class, pretrained=True)
+    elif model_name == 'tf_efficientnet_b6_ns':
+        model = CustomEfficientNet(model_name, n_class, pretrained=True)
+    elif model_name == 'tf_mixnet_s':
+        model = CustomEfficientNet(model_name, n_class, pretrained=True)
+    else:        
+        print('Model arch is not correct')
+        sys.exit()
     return model
 
 
 def get_scheduler(cfg, optimizer):
-    if cfg.shd_para.scheduler_name == 'ReduceLROnPlateau':
+    if cfg.shd_para.scheduler == 'ReduceLROnPlateau':
         scheduler = ReduceLROnPlateau(
             optimizer, mode='min', factor=cfg.shd_para.factor, patience=cfg.shd_para.patience, verbose=True, eps=cfg.shd_para.eps)
-    elif cfg.shd_para.scheduler_name == 'CosineAnnealingLR':
+    elif cfg.shd_para.scheduler == 'CosineAnnealingLR':
         scheduler = CosineAnnealingLR(optimizer, T_max=cfg.shd_para.T_max, eta_min=cfg.shd_para.min_lr, last_epoch=-1)
-    elif cfg.shd_para.scheduler_name == 'CosineAnnealingWarmRestarts':
+    elif cfg.shd_para.scheduler == 'CosineAnnealingWarmRestarts':
         scheduler = CosineAnnealingWarmRestarts(
             optimizer, T_0=cfg.shd_para.T_0, T_mult=1, eta_min=cfg.shd_para.min_lr, last_epoch=-1)
+    else:
+        print('scheduler name is not collect')
+        sys.exit()
     return scheduler
 
 

@@ -39,7 +39,6 @@ from catalyst.data.sampler import BalanceClassSampler
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from Model import efficientnet
 from dataset import CassavaDataset
 from transform import get_train_transforms, get_valid_transforms
 from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score
@@ -104,7 +103,7 @@ def train_fn(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device
                 if scheduler is not None and schd_batch_update:
                     scheduler.step()
             if ((step + 1) % cfg.default.verbose_step == 0) or ((step + 1) == len(train_loader)):
-                description = f'epoch {epoch} loss: {running_loss:.4f}'
+                description = f'epoch {epoch} loss: {losses.avg:.4f}'
                 pbar.set_description(description)
 
     if scheduler is not None and not schd_batch_update:
@@ -174,11 +173,11 @@ def main(cfg):
         train_loader, val_loader = prepare_dataloader(
             cfg, train, trn_idx, val_idx, data_root=cfg.common.img_path)
 
-        model = select_model(
-            cfg.default.model_arch, train.label.nunique(), pretrained=True).to(device)
+        logger.info(cfg.default.model_arch)
+        model = select_model(cfg.default.model_arch, train.label.nunique()).to(device)
         scaler = GradScaler()
         optimizer = torch.optim.Adam(
-            model.parameters(), lr=cfg.default.lr, weight_decay=cfg.default.weight_decay)
+            model.parameters(), lr=cfg.shd_para.lr, weight_decay=cfg.default.weight_decay)
 
         scheduler = get_scheduler(cfg, optimizer)
         # ---------------
