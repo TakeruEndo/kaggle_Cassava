@@ -50,6 +50,10 @@ def select_model(model_name, n_class):
         model = CustomEfficientNet(model_name, n_class, pretrained=True)
     elif model_name == 'tf_mixnet_s':
         model = CustomEfficientNet(model_name, n_class, pretrained=True)
+    elif model_name == 'tf_efficientnet_l2_ns_475':
+        model = CustomEfficientNet(model_name, n_class, pretrained=True)
+    elif model_name == 'tf_efficientnet_b6':
+        model = CustomEfficientNet(model_name, n_class, pretrained=True)                
     else:
         print('Model arch is not correct')
         sys.exit()
