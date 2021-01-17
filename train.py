@@ -192,7 +192,7 @@ def main(cfg):
     print('device:', device)
     seed_everything(cfg.default.seed)
 
-    shutil.copyfile('../../../transform.py', os.path.join(os.getcwd(), 'transform.py'))
+    shutil.copyfile('../../../transforms/transform.py', os.path.join(os.getcwd(), 'transform.py'))
 
     folds = StratifiedKFold(
         n_splits=cfg.default.fold_num, shuffle=True, random_state=cfg.default.seed).split(np.arange(train.shape[0]), train.label.values)
@@ -200,6 +200,8 @@ def main(cfg):
     oof_df = pd.DataFrame()
 
     for fold, (trn_idx, val_idx) in enumerate(folds):
+        if fold != 0:
+            continue
         logger.info(f"========== fold: {fold} training ==========")
 
         print(len(trn_idx), len(val_idx))

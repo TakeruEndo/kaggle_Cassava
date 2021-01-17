@@ -93,7 +93,6 @@ class CassavaDataset(Dataset):
         if self.do_fmix and np.random.uniform(0., 1., size=1)[0] > 0.5:
             with torch.no_grad():
                 # lam, mask = sample_mask(**self.fmix_params)
-
                 lam = np.clip(np.random.beta(
                     self.fmix_params['alpha'], self.fmix_params['alpha']), 0.6, 0.7)
 

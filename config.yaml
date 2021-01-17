@@ -16,7 +16,7 @@ default:
   model_arch: 'tf_efficientnet_b4_ns'
   loss_fn: 'CrossEntropyLoss'
   img_size: 512
-  epochs: 15
+  epochs: 13
   train_bs: 8 
   valid_bs: 8
   weight_decay: 1e-6
