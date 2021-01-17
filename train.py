@@ -86,23 +86,33 @@ def train_fn(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device
             grid = torchvision.utils.make_grid(imgs)
             writer.add_image('train_images', grid, 0)
 
-        with autocast():
-            y_preds = model(imgs)  # output = model(input)
+        if cfg.default.device == 'GPU':
+            with autocast():
+                y_preds = model(imgs)  # output = model(input)
 
+                loss = loss_fn(y_preds, image_labels)
+                losses.update(loss.item(), cfg.default.train_bs)
+                scaler.scale(loss).backward()
+
+                if ((step + 1) % cfg.default.accum_iter == 0) or ((step + 1) == len(train_loader)):
+                    # may unscale_ here if desired (e.g., to allow clipping unscaled gradients)
+                    scaler.step(optimizer)
+                    scaler.update()
+                    optimizer.zero_grad()
+                    if scheduler is not None and schd_batch_update:
+                        scheduler.step()
+        elif cfg.default.device == 'TPU':
+            y_preds = model(imgs)
             loss = loss_fn(y_preds, image_labels)
+            # record loss
             losses.update(loss.item(), cfg.default.train_bs)
-            scaler.scale(loss).backward()
+            if cfg.default.accum_iter > 1:
+                loss = loss / cfg.default.accum_iter
+            loss.backward()
 
-            if ((step + 1) % cfg.default.accum_iter == 0) or ((step + 1) == len(train_loader)):
-                # may unscale_ here if desired (e.g., to allow clipping unscaled gradients)
-                scaler.step(optimizer)
-                scaler.update()
-                optimizer.zero_grad()
-                if scheduler is not None and schd_batch_update:
-                    scheduler.step()
-            if ((step + 1) % cfg.default.verbose_step == 0) or ((step + 1) == len(train_loader)):
-                description = f'epoch {epoch} loss: {losses.avg:.4f}'
-                pbar.set_description(description)
+        if ((step + 1) % cfg.default.verbose_step == 0) or ((step + 1) == len(train_loader)):
+            description = f'epoch {epoch} loss: {losses.avg:.4f}'
+            pbar.set_description(description)
 
     if scheduler is not None and not schd_batch_update:
         scheduler.step()
@@ -121,13 +131,21 @@ def valid_fn(cfg, epoch, model, loss_fn, val_loader, device, writer, logger, sch
         imgs = imgs.to(device).float()
         image_labels = image_labels.to(device).long()
 
-        image_preds = model(imgs)  # output = model(input)
-        # print(image_preds.shape, exam_pred.shape)
-        image_preds_all += [torch.argmax(image_preds, 1).detach().cpu().numpy()]
-        image_targets_all += [image_labels.detach().cpu().numpy()]
+        if cfg.default.device == 'GPU':
 
-        loss = loss_fn(image_preds, image_labels)
-        losses.update(loss.item(), cfg.default.valid_bs)
+            image_preds = model(imgs)  # output = model(input)
+            # print(image_preds.shape, exam_pred.shape)
+            image_preds_all += [torch.argmax(image_preds, 1).detach().cpu().numpy()]
+            image_targets_all += [image_labels.detach().cpu().numpy()]
+
+            loss = loss_fn(image_preds, image_labels)
+            losses.update(loss.item(), cfg.default.valid_bs)
+
+        elif cfg.default.device == 'TPU':
+            y_preds = model(imgs)
+            loss = loss_fn(y_preds, image_labels)
+            # record loss
+            losses.update(loss.item(), cfg.default.trin_bs)
 
         if ((step + 1) % cfg.default.verbose_step == 0) or ((step + 1) == len(val_loader)):
             description = f'epoch {epoch} loss: {losses.avg:.4f}'
@@ -154,6 +172,23 @@ def main(cfg):
 
     train = pd.read_csv(cfg.common.train_path)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    if cfg.common.device == 'TPU':
+        import ignite.distributed as idist
+        os.system('curl https://raw.githubusercontent.com/pytorch/xla/master/contrib/scripts/env-setup.py -o pytorch-xla-env-setup.py')
+        os.system('python pytorch-xla-env-setup.py --version nightly --apt-packages libomp5 libopenblas-dev')
+        os.system('export XLA_USE_BF16=1')
+        os.system('export XLA_TENSOR_ALLOCATOR_MAXSIZE=100000000')
+        import torch_xla.core.xla_model as xm
+        import torch_xla.distributed.parallel_loader as pl
+        import torch_xla.distributed.xla_multiprocessing as xmp
+        cfg.shd_para.lr = cfg.shd_para.lr * cfg.default.nprocs
+        cfg.default.train_bs = cfg.default.train_bs // cfg.default.nprocs        
+
+    if cfg.common.device == 'TPU':
+        device = xm.xla_device()
+    elif cfg.common.device == 'GPU':
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
     print('device:', device)
     seed_everything(cfg.default.seed)
 

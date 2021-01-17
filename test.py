@@ -38,10 +38,10 @@ sys.path.append('FMix-master')
 from Model import efficientnet
 from dataset import CassavaDataset
 from transforms.transform import get_train_transforms, get_valid_transforms, get_inference_transforms
-from utils import seed_everything
+from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score, select_loss
 
 
-def inference_one_epoch(model, data_loader, device):
+def inference_fn(model, data_loader, device):
     model.eval()
 
     image_preds_all = []
@@ -51,8 +51,7 @@ def inference_one_epoch(model, data_loader, device):
         imgs = imgs.to(device).float()
 
         image_preds = model(imgs)  # output = model(input)
-        image_preds_all += [torch.softmax(image_preds,
-                                          1).detach().cpu().numpy()]
+        image_preds_all += [torch.softmax(image_preds, 1).detach().cpu().numpy()]
 
     image_preds_all = np.concatenate(image_preds_all, axis=0)
     return image_preds_all
@@ -66,6 +65,8 @@ def main(cfg):
 
     folds = StratifiedKFold(n_splits=cfg.default.fold_num).split(
         np.arange(train.shape[0]), train.label.values)
+
+    all_test_pred = []
 
     for fold, (trn_idx, val_idx) in enumerate(folds):
         # we'll train fold 0 first
@@ -101,8 +102,7 @@ def main(cfg):
         )
 
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        model = efficientnet.CustomEfficientNet(
-            cfg.default.model_arch, train.label.nunique()).to(device)
+        model = select_model(cfg.default.model_arch, train.label.nunique()).to(device)            
 
         val_preds = []
         tst_preds = []
@@ -110,17 +110,17 @@ def main(cfg):
         # for epoch in range(CFG['epochs']-3):
         for i, epoch in enumerate(cfg.ing.used_epochs):
             model.load_state_dict(torch.load(
-                '../input/cassava-efficientnet-training/{}_fold_{}_{}'.format(cfg.default.model_arch, fold, epoch)))
+                f'../input/cassava-efficientnet-training/{cfg.default.model_arch}_fold_{fold}_{epoch}')
 
             with torch.no_grad():
                 for _ in range(cfg.inf.tta):
                     val_preds += [cfg.inf.weights[i] / sum(
-                        cfg.inf.weights) / cfg.inf.tta * inference_one_epoch(model, val_loader, device)]
+                        cfg.inf.weights) / cfg.inf.tta * inference_fn(model, val_loader, device)]
                     tst_preds += [cfg.inf.weights[i] / sum(
-                        cfg.inf.weights) / cfg.inf.tta * inference_one_epoch(model, tst_loader, device)]
+                        cfg.inf.weights) / cfg.inf.tta * inference_fn(model, tst_loader, device)]
 
         val_preds = np.mean(val_preds, axis=0)
-        tst_preds = np.mean(tst_preds, axis=0)
+        all_test_pred += tst_preds
 
         print('fold {} validation loss = {:.5f}'.format(
             fold, log_loss(valid_.label.values, val_preds)))
@@ -129,3 +129,7 @@ def main(cfg):
 
         del model
         torch.cuda.empty_cache()
+
+    tst_preds = np.mean(all_test_pred, axis=0)
+    test['label'] = np.argmax(tst_preds, axis=1)
+    test.to_csv('submission.csv', index=False)

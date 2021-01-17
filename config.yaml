@@ -3,8 +3,12 @@ hydra:
     dir: ./outputs/${default.model_arch}/${now:%Y-%m-%d-%H-%M}
 common:
   train_path: '../../../input/train.csv'
+  test_path: '../../../input/test.csv'
   submit_path: '../../../input/sample_submission.csv'
   img_path: '../../../input/train_images'
+  pseud_csv_path: '../../../input/pseud_test.csv'
+  pseud_path: '../../../input/pseud_images'
+  device: 'GPU'
 default:
   da_version: 1
   fold_num: 5
@@ -40,3 +44,6 @@ inf:
   tta: 3
   used_epochs: [6,7,8,9]
   weights: [1,1,1,1]
+pseud:
+  epoch: 3
+  batch_size: 5
