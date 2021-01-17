@@ -86,7 +86,7 @@ def train_fn(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device
             grid = torchvision.utils.make_grid(imgs)
             writer.add_image('train_images', grid, 0)
 
-        if cfg.default.device == 'GPU':
+        if cfg.common.device == 'GPU':
             with autocast():
                 y_preds = model(imgs)  # output = model(input)
 
@@ -101,7 +101,7 @@ def train_fn(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device
                     optimizer.zero_grad()
                     if scheduler is not None and schd_batch_update:
                         scheduler.step()
-        elif cfg.default.device == 'TPU':
+        elif cfg.common.device == 'TPU':
             y_preds = model(imgs)
             loss = loss_fn(y_preds, image_labels)
             # record loss
@@ -131,7 +131,7 @@ def valid_fn(cfg, epoch, model, loss_fn, val_loader, device, writer, logger, sch
         imgs = imgs.to(device).float()
         image_labels = image_labels.to(device).long()
 
-        if cfg.default.device == 'GPU':
+        if cfg.common.device == 'GPU':
 
             image_preds = model(imgs)  # output = model(input)
             # print(image_preds.shape, exam_pred.shape)
@@ -141,7 +141,7 @@ def valid_fn(cfg, epoch, model, loss_fn, val_loader, device, writer, logger, sch
             loss = loss_fn(image_preds, image_labels)
             losses.update(loss.item(), cfg.default.valid_bs)
 
-        elif cfg.default.device == 'TPU':
+        elif cfg.common.device == 'TPU':
             y_preds = model(imgs)
             loss = loss_fn(y_preds, image_labels)
             # record loss
@@ -192,16 +192,16 @@ def main(cfg):
     print('device:', device)
     seed_everything(cfg.default.seed)
 
-    shutil.copyfile('../../../transforms/transform.py', os.path.join(os.getcwd(), 'transform.py'))
+    shutil.copyfile('../../../transforms/transform.py', os.path.join(os.getcwd(), 'transform.txt'))
 
     folds = StratifiedKFold(
         n_splits=cfg.default.fold_num, shuffle=True, random_state=cfg.default.seed).split(np.arange(train.shape[0]), train.label.values)
 
     oof_df = pd.DataFrame()
+    oof_df['image_id'] = train.image_id.values
+    oof_labels = np.zeros(len(train))
 
     for fold, (trn_idx, val_idx) in enumerate(folds):
-        if fold != 0:
-            continue
         logger.info(f"========== fold: {fold} training ==========")
 
         print(len(trn_idx), len(val_idx))
@@ -243,16 +243,17 @@ def main(cfg):
 
         check_point = torch.load(f'{cfg.default.model_arch}_fold{fold}_best.pth')
         _oof_df = check_point['preds']
-        oof_df = pd.concat([oof_df, _oof_df])
+        oof_labels[val_idx] = _oof_df
         logger.info(f"========== fold: {fold} result ==========")
-        score = get_score(valid_labels, _oof_df.values)
+        score = get_score(valid_labels, _oof_df)
         logger.info(f'Score - Accuracy: {score}')
 
         del model, optimizer, train_loader, val_loader, scaler, scheduler
         torch.cuda.empty_cache()
-    
+
     logger.info("========== CV ==========")
     score = get_score(train.label, oof_df.values)
+    oof_df['labels'] = oof_labels
     oof_df.to_csv('oof_df.csv', index=False)
     logger.info(f'Score: {score:<.5f}')
     writer.close()
