@@ -102,7 +102,7 @@ def main(cfg):
         )
 
         device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        model = select_model(cfg.default.model_arch, train.label.nunique()).to(device)            
+        model = select_model(cfg.default.model_arch, train.label.nunique()).to(device)
 
         val_preds = []
         tst_preds = []

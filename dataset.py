@@ -1,3 +1,4 @@
+from fmix import sample_mask, make_low_freq_image, binarise_mask
 import sys
 import os
 import numpy as np
@@ -8,7 +9,6 @@ from torch.utils.data import Dataset
 
 sys.path.append('../../../FMix_master')
 sys.path.append('FMix_master')
-from fmix import sample_mask, make_low_freq_image, binarise_mask
 
 
 def get_img(path):
@@ -146,6 +146,9 @@ class CassavaDataset(Dataset):
                 target = rate * target + (1. - rate) * self.labels[cmix_ix]
 
         if self.do_mixup and np.random.uniform(0., 1., size=1)[0] > 0.5:
+            """
+            Reference: https://github.com/karaage0703/pytorch-example/blob/master/pytorch_data_preprocessing.ipynb
+            """
             with torch.no_grad():
                 mix_ix = np.random.choice(self.df.index, size=1)[0]
                 mix_img = get_img(
