@@ -1,3 +1,6 @@
+"""Pseud label training
+"""
+
 import sys
 import os
 import time
@@ -41,12 +44,14 @@ from omegaconf import DictConfig, OmegaConf
 from dataset import CassavaDataset
 from transforms.transform import get_train_transforms, get_valid_transforms
 from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score, select_loss
-from optimizer import SAM
 
 
-def prepare_dataloader(cfg, df, trn_idx, val_idx, data_root='../input/cassava-leaf-disease-classification/train_images/'):
+def prepare_dataloader(cfg, df, test, trn_idx, val_idx, data_root='../input/cassava-leaf-disease-classification/train_images/'):
 
     train_ = df.loc[trn_idx, :].reset_index(drop=True)
+    # testを結合
+    train_ = pd.concat([train_, test]).reset_index(drop=True)
+
     valid_ = df.loc[val_idx, :].reset_index(drop=True)
 
     train_ds = CassavaDataset(
@@ -87,22 +92,14 @@ def train_fn(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device
             grid = torchvision.utils.make_grid(imgs)
             writer.add_image('train_images', grid, 0)
 
-        if cfg.common.device == 'GPU':
+        if cfg.default.device == 'GPU':
             with autocast():
                 y_preds = model(imgs)  # output = model(input)
 
                 loss = loss_fn(y_preds, image_labels)
-            if cfg.default.optimizer == 'SAM':
-                loss.mean().backward()
-                optimizer.first_step(zero_grad=True)
-                # second forward-backward pass
-                with autocast():
-                    y_preds = model(imgs)
-                    loss_second = loss_fn(y_preds, image_labels)
-                loss_second.mean().backward()
-                optimizer.second_step(zero_grad=True)
-            else:
+                losses.update(loss.item(), cfg.default.train_bs)
                 scaler.scale(loss).backward()
+
                 if ((step + 1) % cfg.default.accum_iter == 0) or ((step + 1) == len(train_loader)):
                     # may unscale_ here if desired (e.g., to allow clipping unscaled gradients)
                     scaler.step(optimizer)
@@ -110,8 +107,7 @@ def train_fn(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device
                     optimizer.zero_grad()
                     if scheduler is not None and schd_batch_update:
                         scheduler.step()
-            losses.update(loss.item(), cfg.default.train_bs)
-        elif cfg.common.device == 'TPU':
+        elif cfg.default.device == 'TPU':
             y_preds = model(imgs)
             loss = loss_fn(y_preds, image_labels)
             # record loss
@@ -141,7 +137,7 @@ def valid_fn(cfg, epoch, model, loss_fn, val_loader, device, writer, logger, sch
         imgs = imgs.to(device).float()
         image_labels = image_labels.to(device).long()
 
-        if cfg.common.device == 'GPU':
+        if cfg.default.device == 'GPU':
 
             image_preds = model(imgs)  # output = model(input)
             # print(image_preds.shape, exam_pred.shape)
@@ -151,7 +147,7 @@ def valid_fn(cfg, epoch, model, loss_fn, val_loader, device, writer, logger, sch
             loss = loss_fn(image_preds, image_labels)
             losses.update(loss.item(), cfg.default.valid_bs)
 
-        elif cfg.common.device == 'TPU':
+        elif cfg.default.device == 'TPU':
             y_preds = model(imgs)
             loss = loss_fn(y_preds, image_labels)
             # record loss
@@ -181,6 +177,7 @@ def main(cfg):
     writer = SummaryWriter(log_dir='./logs')
 
     train = pd.read_csv(cfg.common.train_path)
+    test = pd.read_csv(cfg.common.test_path)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     if cfg.common.device == 'TPU':
         import ignite.distributed as idist
@@ -202,21 +199,19 @@ def main(cfg):
     print('device:', device)
     seed_everything(cfg.default.seed)
 
-    shutil.copyfile('../../../transforms/transform.py', os.path.join(os.getcwd(), 'transform.txt'))
+    shutil.copyfile('../../../transform.py', os.path.join(os.getcwd(), 'transform.py'))
 
     folds = StratifiedKFold(
         n_splits=cfg.default.fold_num, shuffle=True, random_state=cfg.default.seed).split(np.arange(train.shape[0]), train.label.values)
 
     oof_df = pd.DataFrame()
-    oof_df['image_id'] = train.image_id.values
-    oof_labels = np.zeros(len(train))
 
     for fold, (trn_idx, val_idx) in enumerate(folds):
         logger.info(f"========== fold: {fold} training ==========")
 
         print(len(trn_idx), len(val_idx))
         train_loader, val_loader = prepare_dataloader(
-            cfg, train, trn_idx, val_idx, data_root=cfg.common.img_path)
+            cfg, train, test, trn_idx, val_idx, data_root=cfg.common.img_path)
 
         logger.info(cfg.default.model_arch)
         model = select_model(cfg.default.model_arch, train.label.nunique()).to(device)
@@ -228,9 +223,9 @@ def main(cfg):
         # ---------------
         # SAMを使いたい
         # ---------------
-        if cfg.default.optimizer == 'SAM':
-            base_optimizer = torch.optim.SGD
-            optimizer = SAM(model.parameters(), base_optimizer, rho=0.05, lr=0.1, momentum=0.9, weight_decay=0.0005)
+        # base_optimizer = torch.optim.SGD
+        # optimizer = SAM(model.parameters(), base_optimizer, rho=0.05, lr=0.1, momentum=0.9, weight_decay=0.0005)
+        # scheduler = None
 
         loss_tr = select_loss(cfg.default.loss_fn).to(device)  # MyCrossEntropyLoss().to(device)
         loss_fn = select_loss(cfg.default.loss_fn).to(device)
@@ -253,17 +248,16 @@ def main(cfg):
 
         check_point = torch.load(f'{cfg.default.model_arch}_fold{fold}_best.pth')
         _oof_df = check_point['preds']
-        oof_labels[val_idx] = _oof_df
+        oof_df = pd.concat([oof_df, _oof_df])
         logger.info(f"========== fold: {fold} result ==========")
-        score = get_score(valid_labels, _oof_df)
+        score = get_score(valid_labels, _oof_df.values)
         logger.info(f'Score - Accuracy: {score}')
 
         del model, optimizer, train_loader, val_loader, scaler, scheduler
         torch.cuda.empty_cache()
-
+    
     logger.info("========== CV ==========")
     score = get_score(train.label, oof_df.values)
-    oof_df['labels'] = oof_labels
     oof_df.to_csv('oof_df.csv', index=False)
     logger.info(f'Score: {score:<.5f}')
     writer.close()

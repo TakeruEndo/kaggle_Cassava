@@ -32,16 +32,88 @@ import torch.nn.functional as F
 from torch.utils.tensorboard import SummaryWriter
 
 import timm
+#from efficientnet_pytorch import EfficientNet
 from scipy.ndimage.interpolation import zoom
 from catalyst.data.sampler import BalanceClassSampler
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
+import pytorch_lightning as pl
+from pytorch_lightning.metrics.functional import accuracy
+
 from dataset import CassavaDataset
 from transforms.transform import get_train_transforms, get_valid_transforms
-from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score, select_loss
-from optimizer import SAM
+from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score
+
+
+
+class CassavaModel(pl.LightningModule):
+
+    def __init__(self, cfg):
+        super().__init__()
+        self.model = timm.create_model(model_arch, pretrained=True)
+        n_features = self.model.classifier.in_features
+        self.model.classifier = nn.Linear(n_features, n_class)
+
+    def forward(self, x):
+        x = self.model(x)
+        return x
+
+    def training_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self(x)
+        loss = F.nll_loss(logits, y)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = batch
+        logits = self(x)
+        loss = F.nll_loss(logits, y)
+        preds = torch.argmax(logits, dim=1)
+        acc = accuracy(preds, y)
+
+        # Calling self.log will surface up scalars for you in TensorBoard
+        self.log('val_loss', loss, prog_bar=True)
+        self.log('val_acc', acc, prog_bar=True)
+        return loss
+
+    def test_step(self, batch, batch_idx):
+        # Here we just reuse the validation_step for testing
+        return self.validation_step(batch, batch_idx)
+
+    def configure_optimizers(self):
+        optimizer = torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+        return optimizer
+
+    # DATA RELATED HOOKS
+    def prepare_data(self):
+        # download
+        MNIST(self.data_dir, train=True, download=True)
+        MNIST(self.data_dir, train=False, download=True)
+
+    def setup(self, stage=None):
+
+        # Assign train/val datasets for use in dataloaders
+        if stage == 'fit' or stage is None:
+            mnist_full = MNIST(self.data_dir, train=True, transform=self.transform)
+            self.mnist_train, self.mnist_val = random_split(mnist_full, [55000, 5000])
+
+        # Assign test dataset for use in dataloader(s)
+        if stage == 'test' or stage is None:
+            self.mnist_test = MNIST(self.data_dir, train=False, transform=self.transform)
+
+    def train_dataloader(self):
+        return DataLoader(self.mnist_train, batch_size=32)
+
+    def val_dataloader(self):
+        return DataLoader(self.mnist_val, batch_size=32)
+
+    def test_dataloader(self):
+        return DataLoader(self.mnist_test, batch_size=32)        
+
+
+
 
 
 def prepare_dataloader(cfg, df, trn_idx, val_idx, data_root='../input/cassava-leaf-disease-classification/train_images/'):
@@ -76,6 +148,7 @@ def prepare_dataloader(cfg, df, trn_idx, val_idx, data_root='../input/cassava-le
 def train_fn(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device, writer, scheduler=None, schd_batch_update=False):
     model.train()
 
+    running_loss = None
     losses = AverageMeter()
 
     pbar = tqdm(enumerate(train_loader), total=len(train_loader))
@@ -87,42 +160,23 @@ def train_fn(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device
             grid = torchvision.utils.make_grid(imgs)
             writer.add_image('train_images', grid, 0)
 
-        if cfg.common.device == 'GPU':
-            with autocast():
-                y_preds = model(imgs)  # output = model(input)
+        with autocast():
+            y_preds = model(imgs)  # output = model(input)
 
-                loss = loss_fn(y_preds, image_labels)
-            if cfg.default.optimizer == 'SAM':
-                loss.mean().backward()
-                optimizer.first_step(zero_grad=True)
-                # second forward-backward pass
-                with autocast():
-                    y_preds = model(imgs)
-                    loss_second = loss_fn(y_preds, image_labels)
-                loss_second.mean().backward()
-                optimizer.second_step(zero_grad=True)
-            else:
-                scaler.scale(loss).backward()
-                if ((step + 1) % cfg.default.accum_iter == 0) or ((step + 1) == len(train_loader)):
-                    # may unscale_ here if desired (e.g., to allow clipping unscaled gradients)
-                    scaler.step(optimizer)
-                    scaler.update()
-                    optimizer.zero_grad()
-                    if scheduler is not None and schd_batch_update:
-                        scheduler.step()
-            losses.update(loss.item(), cfg.default.train_bs)
-        elif cfg.common.device == 'TPU':
-            y_preds = model(imgs)
             loss = loss_fn(y_preds, image_labels)
-            # record loss
             losses.update(loss.item(), cfg.default.train_bs)
-            if cfg.default.accum_iter > 1:
-                loss = loss / cfg.default.accum_iter
-            loss.backward()
+            scaler.scale(loss).backward()
 
-        if ((step + 1) % cfg.default.verbose_step == 0) or ((step + 1) == len(train_loader)):
-            description = f'epoch {epoch} loss: {losses.avg:.4f}'
-            pbar.set_description(description)
+            if ((step + 1) % cfg.default.accum_iter == 0) or ((step + 1) == len(train_loader)):
+                # may unscale_ here if desired (e.g., to allow clipping unscaled gradients)
+                scaler.step(optimizer)
+                scaler.update()
+                optimizer.zero_grad()
+                if scheduler is not None and schd_batch_update:
+                    scheduler.step()
+            if ((step + 1) % cfg.default.verbose_step == 0) or ((step + 1) == len(train_loader)):
+                description = f'epoch {epoch} loss: {losses.avg:.4f}'
+                pbar.set_description(description)
 
     if scheduler is not None and not schd_batch_update:
         scheduler.step()
@@ -141,21 +195,13 @@ def valid_fn(cfg, epoch, model, loss_fn, val_loader, device, writer, logger, sch
         imgs = imgs.to(device).float()
         image_labels = image_labels.to(device).long()
 
-        if cfg.common.device == 'GPU':
+        image_preds = model(imgs)  # output = model(input)
+        # print(image_preds.shape, exam_pred.shape)
+        image_preds_all += [torch.argmax(image_preds, 1).detach().cpu().numpy()]
+        image_targets_all += [image_labels.detach().cpu().numpy()]
 
-            image_preds = model(imgs)  # output = model(input)
-            # print(image_preds.shape, exam_pred.shape)
-            image_preds_all += [torch.argmax(image_preds, 1).detach().cpu().numpy()]
-            image_targets_all += [image_labels.detach().cpu().numpy()]
-
-            loss = loss_fn(image_preds, image_labels)
-            losses.update(loss.item(), cfg.default.valid_bs)
-
-        elif cfg.common.device == 'TPU':
-            y_preds = model(imgs)
-            loss = loss_fn(y_preds, image_labels)
-            # record loss
-            losses.update(loss.item(), cfg.default.trin_bs)
+        loss = loss_fn(image_preds, image_labels)
+        losses.update(loss.item(), cfg.default.valid_bs)
 
         if ((step + 1) % cfg.default.verbose_step == 0) or ((step + 1) == len(val_loader)):
             description = f'epoch {epoch} loss: {losses.avg:.4f}'
@@ -182,34 +228,15 @@ def main(cfg):
 
     train = pd.read_csv(cfg.common.train_path)
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    if cfg.common.device == 'TPU':
-        import ignite.distributed as idist
-        os.system('curl https://raw.githubusercontent.com/pytorch/xla/master/contrib/scripts/env-setup.py -o pytorch-xla-env-setup.py')
-        os.system('python pytorch-xla-env-setup.py --version nightly --apt-packages libomp5 libopenblas-dev')
-        os.system('export XLA_USE_BF16=1')
-        os.system('export XLA_TENSOR_ALLOCATOR_MAXSIZE=100000000')
-        import torch_xla.core.xla_model as xm
-        import torch_xla.distributed.parallel_loader as pl
-        import torch_xla.distributed.xla_multiprocessing as xmp
-        cfg.shd_para.lr = cfg.shd_para.lr * cfg.default.nprocs
-        cfg.default.train_bs = cfg.default.train_bs // cfg.default.nprocs        
-
-    if cfg.common.device == 'TPU':
-        device = xm.xla_device()
-    elif cfg.common.device == 'GPU':
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
     print('device:', device)
     seed_everything(cfg.default.seed)
 
-    shutil.copyfile('../../../transforms/transform.py', os.path.join(os.getcwd(), 'transform.txt'))
+    shutil.copyfile('../../../transform.py', os.path.join(os.getcwd(), 'transform.py'))
 
     folds = StratifiedKFold(
         n_splits=cfg.default.fold_num, shuffle=True, random_state=cfg.default.seed).split(np.arange(train.shape[0]), train.label.values)
 
     oof_df = pd.DataFrame()
-    oof_df['image_id'] = train.image_id.values
-    oof_labels = np.zeros(len(train))
 
     for fold, (trn_idx, val_idx) in enumerate(folds):
         logger.info(f"========== fold: {fold} training ==========")
@@ -228,12 +255,12 @@ def main(cfg):
         # ---------------
         # SAMを使いたい
         # ---------------
-        if cfg.default.optimizer == 'SAM':
-            base_optimizer = torch.optim.SGD
-            optimizer = SAM(model.parameters(), base_optimizer, rho=0.05, lr=0.1, momentum=0.9, weight_decay=0.0005)
+        # base_optimizer = torch.optim.SGD
+        # optimizer = SAM(model.parameters(), base_optimizer, rho=0.05, lr=0.1, momentum=0.9, weight_decay=0.0005)
+        # scheduler = None
 
-        loss_tr = select_loss(cfg.default.loss_fn).to(device)  # MyCrossEntropyLoss().to(device)
-        loss_fn = select_loss(cfg.default.loss_fn).to(device)
+        loss_tr = nn.CrossEntropyLoss().to(device)  # MyCrossEntropyLoss().to(device)
+        loss_fn = nn.CrossEntropyLoss().to(device)
 
         best_score = 0.
         for epoch in range(cfg.default.epochs):
@@ -253,17 +280,16 @@ def main(cfg):
 
         check_point = torch.load(f'{cfg.default.model_arch}_fold{fold}_best.pth')
         _oof_df = check_point['preds']
-        oof_labels[val_idx] = _oof_df
+        oof_df = pd.concat([oof_df, _oof_df])
         logger.info(f"========== fold: {fold} result ==========")
-        score = get_score(valid_labels, _oof_df)
+        score = get_score(valid_labels, _oof_df.values)
         logger.info(f'Score - Accuracy: {score}')
 
         del model, optimizer, train_loader, val_loader, scaler, scheduler
         torch.cuda.empty_cache()
-
+    
     logger.info("========== CV ==========")
     score = get_score(train.label, oof_df.values)
-    oof_df['labels'] = oof_labels
     oof_df.to_csv('oof_df.csv', index=False)
     logger.info(f'Score: {score:<.5f}')
     writer.close()

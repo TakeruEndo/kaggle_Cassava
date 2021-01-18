@@ -3,18 +3,23 @@ hydra:
     dir: ./outputs/${default.model_arch}/${now:%Y-%m-%d-%H-%M}
 common:
   train_path: '../../../input/train.csv'
+  test_path: '../../../input/test.csv'
   submit_path: '../../../input/sample_submission.csv'
   img_path: '../../../input/train_images'
+  pseud_csv_path: '../../../input/pseud_test.csv'
+  pseud_path: '../../../input/pseud_images'
+  device: 'GPU'
 default:
   da_version: 1
   fold_num: 5
   seed: 214
   model_arch: 'tf_efficientnet_b4_ns'
   loss_fn: 'CrossEntropyLoss'
+  optimizer: 'Normal'  
   img_size: 512
-  epochs: 13
-  train_bs: 8 
-  valid_bs: 8
+  epochs: 11
+  train_bs: 16
+  valid_bs: 16
   weight_decay: 1e-6
   num_workers: 4
   accum_iter: 2 # suppoprt to do batch accumulation for backprop with effectively larger batch size
@@ -40,3 +45,6 @@ inf:
   tta: 3
   used_epochs: [6,7,8,9]
   weights: [1,1,1,1]
+pseud:
+  epoch: 3
+  batch_size: 5
