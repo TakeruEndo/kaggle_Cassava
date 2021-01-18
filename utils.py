@@ -69,6 +69,8 @@ def select_loss(loss_name):
         return SymmetricCrossEntropy()
     elif loss_name == 'TaylorCrossEntropyLoss':
         return TaylorCrossEntropyLoss()
+    elif loss_name == 'LabelSmoothingLoss':
+        return LabelSmoothingLoss()
     else:
         print('Loss name is incorrect')
         sys.exit()

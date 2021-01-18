@@ -15,10 +15,11 @@ default:
   seed: 214
   model_arch: 'tf_efficientnet_b4_ns'
   loss_fn: 'CrossEntropyLoss'
+  optimizer: 'Normal'  
   img_size: 512
-  epochs: 13
-  train_bs: 8 
-  valid_bs: 8
+  epochs: 11
+  train_bs: 16
+  valid_bs: 16
   weight_decay: 1e-6
   num_workers: 4
   accum_iter: 2 # suppoprt to do batch accumulation for backprop with effectively larger batch size

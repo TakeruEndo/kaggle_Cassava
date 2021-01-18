@@ -41,6 +41,7 @@ from omegaconf import DictConfig, OmegaConf
 from dataset import CassavaDataset
 from transforms.transform import get_train_transforms, get_valid_transforms
 from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score, select_loss
+from optimizer import SAM
 
 
 def prepare_dataloader(cfg, df, trn_idx, val_idx, data_root='../input/cassava-leaf-disease-classification/train_images/'):
@@ -91,9 +92,17 @@ def train_fn(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device
                 y_preds = model(imgs)  # output = model(input)
 
                 loss = loss_fn(y_preds, image_labels)
-                losses.update(loss.item(), cfg.default.train_bs)
+            if cfg.default.optimizer == 'SAM':
+                loss.mean().backward()
+                optimizer.first_step(zero_grad=True)
+                # second forward-backward pass
+                with autocast():
+                    y_preds = model(imgs)
+                    loss_second = loss_fn(y_preds, image_labels)
+                loss_second.mean().backward()
+                optimizer.second_step(zero_grad=True)
+            else:
                 scaler.scale(loss).backward()
-
                 if ((step + 1) % cfg.default.accum_iter == 0) or ((step + 1) == len(train_loader)):
                     # may unscale_ here if desired (e.g., to allow clipping unscaled gradients)
                     scaler.step(optimizer)
@@ -101,6 +110,7 @@ def train_fn(cfg, epoch, model, loss_fn, optimizer, train_loader, scaler, device
                     optimizer.zero_grad()
                     if scheduler is not None and schd_batch_update:
                         scheduler.step()
+            losses.update(loss.item(), cfg.default.train_bs)
         elif cfg.common.device == 'TPU':
             y_preds = model(imgs)
             loss = loss_fn(y_preds, image_labels)
@@ -218,9 +228,9 @@ def main(cfg):
         # ---------------
         # SAMを使いたい
         # ---------------
-        # base_optimizer = torch.optim.SGD
-        # optimizer = SAM(model.parameters(), base_optimizer, rho=0.05, lr=0.1, momentum=0.9, weight_decay=0.0005)
-        # scheduler = None
+        if cfg.default.optimizer == 'SAM':
+            base_optimizer = torch.optim.SGD
+            optimizer = SAM(model.parameters(), base_optimizer, rho=0.05, lr=0.1, momentum=0.9, weight_decay=0.0005)
 
         loss_tr = select_loss(cfg.default.loss_fn).to(device)  # MyCrossEntropyLoss().to(device)
         loss_fn = select_loss(cfg.default.loss_fn).to(device)
