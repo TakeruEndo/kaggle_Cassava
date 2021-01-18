@@ -42,6 +42,8 @@ def select_model(model_name, n_class):
         model = CustomViT(model_name, n_class, pretrained=False)
     elif model_name == 'resnext50_32x4d':
         model = CustomResNext(model_name, n_class, pretrained=True)
+    elif model_name == 'tf_efficientnet_b3_ns':
+        model = CustomEfficientNet(model_name, n_class, pretrained=True)
     elif model_name == 'tf_efficientnet_b4_ns':
         model = CustomEfficientNet(model_name, n_class, pretrained=True)
     elif model_name == 'tf_efficientnet_b5_ns':
@@ -69,6 +71,8 @@ def select_loss(loss_name):
         return SymmetricCrossEntropy()
     elif loss_name == 'TaylorCrossEntropyLoss':
         return TaylorCrossEntropyLoss()
+    elif loss_name == 'LabelSmoothingLoss':
+        return LabelSmoothingLoss()
     else:
         print('Loss name is incorrect')
         sys.exit()
