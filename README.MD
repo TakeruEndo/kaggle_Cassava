@@ -1,4 +1,23 @@
-## [Cassava Leaf Disease Classification](https://www.kaggle.com/c/cassava-leaf-disease-classification)
+# [Cassava Leaf Disease Classification](https://www.kaggle.com/c/cassava-leaf-disease-classification)
+
+## 実験結果
+| model_name            | image_size | loss                 | optimizer | schduler | data_aug | best_score_loss | best_score |
+| --------------------- | ---------- | -------------------- | --------- | -------- | -------- | --------------- | ---------- |
+| tf_efficientnet_b4_ns | 512        | FocalCosineLoss      | adam      | ConsAnne | 1        | 0.1355          | 0.89276    |
+| tf_efficientnet_b4_ns | 512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3251          | 0.89462    |
+| tf_efficientnet_b4_ns | 600        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3103          | 0.89626    |
+| tf_efficientnet_b4_ns | 512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3251          | 0.89462    |
+| tf_efficientnet_b4_ns | 512        | CrossEntropy         | adam      | ConsAnne | 2        | 0.3178          | 0.89393    |
+| tf_efficientnet_b4_ns | 600        | LabelSmmothingLoss   | adam      | ConsAnne | 1        | 0.3100          | 0.89860    |
+| tf_efficientnet_b5_ns | 512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3103          | 0.89700    |
+| tf_efficientnet_b5_ns | 600        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3103          | 0.89603    |
+| tf_efficientnet_b5_ns | 512        | LabelSmmothingLoss   | adam      | ConsAnne | 1        | 0.3370          | 0.89860    |
+| tf_efficientnet_b5_ns | 512        | TaylorCrossEntropy   | adam      | ConsAnne | 1        | 0.3095          | 0.89766    |
+| tf_efficientnet_b5_ns | 512        | SymmtricCrossENtropy | adam      | ConsAnne | 1        | 0.3574          | 0.89580    |
+| tf_efficientnet_b6    | 528        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3407          | 0.89042    |
+| tf_efficientnet_b6_ns | 528        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3294          | 0.88902    |
+| tf_mixnet_s           | 512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3383          | 0.88505    |
+| vit_base_patch16_38   | 384        | CrossEntropy         | adam      | ConsAnne | 1        | 0.7168          | 0.73808    |
 
 ## TODO:
 - [ ] Pseud label learning
