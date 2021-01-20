@@ -1,6 +1,6 @@
 ## [Cassava Leaf Disease Classification](https://www.kaggle.com/c/cassava-leaf-disease-classification)
 
-<img src='imgs/img.png', width=600 />
+<img src='./imgs/img.png', width=600 \>
 
 ## 実験結果
 | model_name            | image_size | loss                 | optimizer | schduler | data_aug | best_score_loss | best_score |
