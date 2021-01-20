@@ -2,3 +2,5 @@ __pycache__
 .DS_Store
 outputs/*
 input/*
+notebook/images/*
+notebook/.ipynb_checkpoints
