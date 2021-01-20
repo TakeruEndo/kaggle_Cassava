@@ -1,3 +1,4 @@
+from fmix import sample_mask, make_low_freq_image, binarise_mask
 import sys
 import os
 import numpy as np
@@ -8,7 +9,6 @@ from torch.utils.data import Dataset
 
 sys.path.append('../../../FMix_master')
 sys.path.append('FMix_master')
-from fmix import sample_mask, make_low_freq_image, binarise_mask
 
 
 def get_img(path):
@@ -43,6 +43,7 @@ class CassavaDataset(Dataset):
                  one_hot_label=False,
                  do_fmix=False,
                  do_cutmix=False,
+                 do_mixup=False,
                  cutmix_params={
                      'alpha': 1,
                  }
@@ -89,8 +90,10 @@ class CassavaDataset(Dataset):
 
         if self.transforms:
             img = self.transforms(image=img)['image']
+        
+        random_num = np.random.uniform(0., 1., size=1)[0]
 
-        if self.do_fmix and np.random.uniform(0., 1., size=1)[0] > 0.5:
+        if self.do_fmix and random_num > 0.5:
             with torch.no_grad():
                 # lam, mask = sample_mask(**self.fmix_params)
                 lam = np.clip(np.random.beta(
@@ -114,8 +117,6 @@ class CassavaDataset(Dataset):
                 # mix image
                 img = mask_torch * img + (1. - mask_torch) * fmix_img
 
-                # print(mask.shape)
-
                 # assert self.output_label==True and self.one_hot_label==True
 
                 # mix target
@@ -123,8 +124,7 @@ class CassavaDataset(Dataset):
                 target = rate * target + (1. - rate) * self.labels[fmix_ix]
                 # print(target, mask, img)
                 # assert False
-
-        if self.do_cutmix and np.random.uniform(0., 1., size=1)[0] > 0.5:
+        if self.do_cutmix and random_num > 0.75 and random_num < 1.0:
             # print(img.sum(), img.shape)
             with torch.no_grad():
                 cmix_ix = np.random.choice(self.df.index, size=1)[0]
@@ -143,6 +143,21 @@ class CassavaDataset(Dataset):
                 rate = 1 - ((bbx2 - bbx1) * (bby2 - bby1) /
                             (self.cfg.default.img_size * self.cfg.default.img_size))
                 target = rate * target + (1. - rate) * self.labels[cmix_ix]
+        if self.do_mixup and random_num > 0.50 and random_num < 0.75:
+            """
+            Reference: https://github.com/karaage0703/pytorch-example/blob/master/pytorch_data_preprocessing.ipynb
+            """
+            with torch.no_grad():
+                mix_ix = np.random.choice(self.df.index, size=1)[0]
+                mix_img = get_img(
+                    "{}/{}".format(self.data_root, self.df.iloc[mix_ix]['image_id']))
+                if self.transforms:
+                    mix_img = self.transforms(image=mix_img)['image']
+
+                lam = np.random.beta(1.0, 1.0)
+                img = lam * img + (1 - lam) * mix_img
+
+                target = lam * target + (1. - lam) * self.labels[mix_ix]
 
             # print('-', img.sum())
             # print(target)

@@ -39,20 +39,28 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 
 from dataset import CassavaDataset
-from transforms.transform import get_train_transforms, get_valid_transforms
+from transforms.transform import get_train_transforms, get_valid_transforms, get_inference_transforms
 from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score, select_loss
 from optimizer import SAM
 
 
-def prepare_dataloader(cfg, df, trn_idx, val_idx, data_root='../input/cassava-leaf-disease-classification/train_images/'):
+def prepare_dataloader(cfg, df, trn_idx, val_idx, revise=False, data_root='../input/cassava-leaf-disease-classification/train_images/'):
 
     train_ = df.loc[trn_idx, :].reset_index(drop=True)
     valid_ = df.loc[val_idx, :].reset_index(drop=True)
 
-    train_ds = CassavaDataset(
-        cfg, train_, data_root, transforms=get_train_transforms(cfg), output_label=True, one_hot_label=False, do_fmix=False, do_cutmix=False)
-    valid_ds = CassavaDataset(
-        cfg, valid_, data_root, transforms=get_valid_transforms(cfg), output_label=True)
+    if revise:
+        train_ds = CassavaDataset(
+            cfg, train_, data_root, transforms=get_inference_transforms(cfg), output_label=True,
+            one_hot_label=False, do_fmix=False, do_cutmix=False, do_mixup=False)
+        valid_ds = CassavaDataset(
+            cfg, valid_, data_root, transforms=get_inference_transforms(cfg), output_label=True)
+    else:
+        train_ds = CassavaDataset(
+            cfg, train_, data_root, transforms=get_train_transforms(cfg), output_label=True,
+            one_hot_label=False, do_fmix=False, do_cutmix=False, do_mixup=True)
+        valid_ds = CassavaDataset(
+            cfg, valid_, data_root, transforms=get_valid_transforms(cfg), output_label=True)
 
     train_loader = torch.utils.data.DataLoader(
         train_ds,
@@ -216,7 +224,7 @@ def main(cfg):
 
         print(len(trn_idx), len(val_idx))
         train_loader, val_loader = prepare_dataloader(
-            cfg, train, trn_idx, val_idx, data_root=cfg.common.img_path)
+            cfg, train, trn_idx, val_idx, revise=False, data_root=cfg.common.img_path)
 
         logger.info(cfg.default.model_arch)
         model = select_model(cfg.default.model_arch, train.label.nunique()).to(device)
@@ -248,7 +256,7 @@ def main(cfg):
             if score > best_score:
                 best_score = score
                 logger.info(f'Epoch {epoch+1} - Save Best Score: {best_score:.4f} Model')
-                torch.save({'model': model.state_dict(), 'preds': valid_preds}, f'{cfg.default.model_arch}_fold{fold}_best.pth')
+                torch.save({'model': model.state_dict(), 'preds': valid_preds}, f'{cfg.default.model_arch}_fold_{fold}_best.pth')
             torch.save(model.state_dict(), f'{cfg.default.model_arch}_fold_{fold}_{epoch}')
 
         check_point = torch.load(f'{cfg.default.model_arch}_fold{fold}_best.pth')
@@ -260,6 +268,46 @@ def main(cfg):
 
         del model, optimizer, train_loader, val_loader, scaler, scheduler
         torch.cuda.empty_cache()
+        
+        if True:
+            logger.info(f"========== fold: {fold} Revised training ==========")
+
+            train_loader, val_loader = prepare_dataloader(
+                cfg, train, trn_idx, val_idx, revise=True, data_root=cfg.common.img_path)
+
+            model = select_model(cfg.default.model_arch, train.label.nunique())
+            model.load_state_dict(torch.load(f'{cfg.default.model_arch}_fold_{fold}_best.pth'))
+            model = model.to(device)
+            scaler = GradScaler()
+            optimizer = torch.optim.Adam(
+                model.parameters(), lr=cfg.shd_para.lr, weight_decay=cfg.default.weight_decay)
+
+            scheduler = get_scheduler(cfg, optimizer)
+
+            for epoch in range(cfg.default.re_epochs):
+                train_loss = train_fn(
+                    cfg, epoch, model, loss_tr, optimizer, train_loader, scaler, device, writer, scheduler=scheduler, schd_batch_update=False)
+                with torch.no_grad():
+                    valid_loss, valid_preds, valid_labels = valid_fn(
+                        cfg, epoch, model, loss_fn, val_loader, device, writer, logger, scheduler=None, schd_loss_update=False)
+                score = get_score(valid_labels, valid_preds)
+                logger.info(f'Epoch {epoch+1} - avg_train_loss: {train_loss:.4f}  avg_val_loss: {valid_loss:.4f}')
+                logger.info(f'Epoch {epoch+1} - Accuracy: {score}')
+                if score > best_score:
+                    best_score = score
+                    logger.info(f'Epoch {epoch+1} - Save Best Score: {best_score:.4f} Model')
+                    torch.save({'model': model.state_dict(), 'preds': valid_preds}, f'{cfg.default.model_arch}_revised_fold_{fold}_best.pth')
+                torch.save(model.state_dict(), f'{cfg.default.model_arch}_revised_fold_{fold}_{epoch}')
+
+            check_point = torch.load(f'{cfg.default.model_arch}_revised_fold_{fold}_best.pth')
+            _oof_df = check_point['preds']
+            oof_labels[val_idx] = _oof_df
+            logger.info(f"========== fold: {fold} result ==========")
+            score = get_score(valid_labels, _oof_df)
+            logger.info(f'Score - Accuracy: {score}')
+
+            del model, optimizer, train_loader, val_loader, scaler, scheduler
+            torch.cuda.empty_cache()
 
     logger.info("========== CV ==========")
     score = get_score(train.label, oof_df.values)

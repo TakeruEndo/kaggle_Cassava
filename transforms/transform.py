@@ -92,7 +92,7 @@ def get_train_transforms(cfg):
                 CoarseDropout(p=0.8),
             ], p=1.0),
             ToTensorV2(p=1.0),
-        ], p=1.)        
+        ], p=1.) 
 
 
 def get_valid_transforms(cfg):
