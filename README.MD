@@ -1,6 +1,6 @@
 ## [Cassava Leaf Disease Classification](https://www.kaggle.com/c/cassava-leaf-disease-classification)
 
-![cassava]('https://github.com/TakeruEndo/kaggle_Cassava/blob/main/imgs/img.png')
+![cassava](https://github.com/TakeruEndo/kaggle_Cassava/blob/main/imgs/img.png)
 
 ## 実験結果
 | model_name            | image_size | loss                 | optimizer | schduler | data_aug | best_score_loss | best_score |
