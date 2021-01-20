@@ -1,5 +1,3 @@
-## [Cassava Leaf Disease Classification](https://www.kaggle.com/c/cassava-leaf-disease-classification)
-
 <a href="https://www.kaggle.com/c/cassava-leaf-disease-classification"><img src=https://github.com/TakeruEndo/kaggle_Cassava/blob/main/imgs/img.png></a>
 
 ## 実験結果
