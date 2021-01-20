@@ -9,6 +9,7 @@
 | tf_efficientnet_b4_ns | 512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3251          | 0.89462    |
 | tf_efficientnet_b4_ns | 512        | CrossEntropy         | adam      | ConsAnne | 2        | 0.3178          | 0.89393    |
 | tf_efficientnet_b4_ns | 600        | LabelSmmothingLoss   | adam      | ConsAnne | 1        | 0.3100          | 0.89860    |
+| tf_efficientnet_b4_ns | 600        | LabelSmmothingLoss   | adam      | CosineAnnealingLR | 1        | 0.3085          | 0.89579    |
 | tf_efficientnet_b5_ns | 512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3103          | 0.89700    |
 | tf_efficientnet_b5_ns | 600        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3103          | 0.89603    |
 | tf_efficientnet_b5_ns | 512        | LabelSmmothingLoss   | adam      | ConsAnne | 1        | 0.3370          | 0.89860    |
