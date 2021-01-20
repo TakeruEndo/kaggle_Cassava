@@ -1,4 +1,3 @@
-from fmix import sample_mask, make_low_freq_image, binarise_mask
 import sys
 import os
 import numpy as np
@@ -9,6 +8,7 @@ from torch.utils.data import Dataset
 
 sys.path.append('../../../FMix_master')
 sys.path.append('FMix_master')
+from fmix import sample_mask, make_low_freq_image, binarise_mask
 
 
 def get_img(path):
@@ -63,6 +63,7 @@ class CassavaDataset(Dataset):
             'reformulate': False
         },
         self.do_cutmix = do_cutmix
+        self.do_mixup = do_mixup
         self.cutmix_params = cutmix_params
 
         self.output_label = output_label
@@ -158,10 +159,6 @@ class CassavaDataset(Dataset):
                 img = lam * img + (1 - lam) * mix_img
 
                 target = lam * target + (1. - lam) * self.labels[mix_ix]
-
-            # print('-', img.sum())
-            # print(target)
-            # assert False
 
         # do label smoothing
         # print(type(img), type(target))

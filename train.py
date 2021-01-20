@@ -58,7 +58,7 @@ def prepare_dataloader(cfg, df, trn_idx, val_idx, revise=False, data_root='../in
     else:
         train_ds = CassavaDataset(
             cfg, train_, data_root, transforms=get_train_transforms(cfg), output_label=True,
-            one_hot_label=False, do_fmix=False, do_cutmix=False, do_mixup=True)
+            one_hot_label=False, do_fmix=False, do_cutmix=True, do_mixup=True)
         valid_ds = CassavaDataset(
             cfg, valid_, data_root, transforms=get_valid_transforms(cfg), output_label=True)
 
