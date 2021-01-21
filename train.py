@@ -227,7 +227,7 @@ def main(cfg):
             cfg, train, trn_idx, val_idx, revise=False, data_root=cfg.common.img_path)
 
         logger.info(cfg.default.model_arch)
-        model = select_model(cfg.default.model_arch, train.label.nunique()).to(device)
+        model = select_model(cfg, cfg.default.model_arch, train.label.nunique()).to(device)
         scaler = GradScaler()
         optimizer = torch.optim.Adam(
             model.parameters(), lr=cfg.shd_para.lr, weight_decay=cfg.default.weight_decay)

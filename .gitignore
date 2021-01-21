@@ -4,3 +4,4 @@ outputs/*
 input/*
 notebook/images/*
 notebook/.ipynb_checkpoints
+RepVGG/weight/*

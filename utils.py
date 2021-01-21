@@ -11,6 +11,7 @@ from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, CosineAnnealin
 
 from model.nn_model import *
 from loss import *
+from RepVGG import repvgg
 
 
 def seed_everything(seed):
@@ -35,7 +36,7 @@ def init_logger(log_file):
     return logger
 
 
-def select_model(model_name, n_class):
+def select_model(cfg, model_name, n_class):
     if model_name == 'deit_base_patch16_224':
         model = CustomDeiT(model_name, n_class, pretrained=False)
     elif model_name == 'vit_base_patch16_384':
@@ -55,7 +56,10 @@ def select_model(model_name, n_class):
     elif model_name == 'tf_efficientnet_l2_ns_475':
         model = CustomEfficientNet(model_name, n_class, pretrained=True)
     elif model_name == 'tf_efficientnet_b6':
-        model = CustomEfficientNet(model_name, n_class, pretrained=True)                
+        model = CustomEfficientNet(model_name, n_class, pretrained=True)
+    elif model_name[:6] == 'RepVGG':
+        repvgg_build_func = repvgg.get_RepVGG_func_by_name(model_name)
+        model = repvgg_build_func(deploy=False)                     
     else:
         print('Model arch is not correct')
         sys.exit()
