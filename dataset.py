@@ -10,6 +10,7 @@ sys.path.append('../../../FMix_master')
 sys.path.append('FMix_master')
 from fmix import sample_mask, make_low_freq_image, binarise_mask
 
+
 def get_img(path):
     im_bgr = cv2.imread(path)
     im_rgb = im_bgr[:, :, ::-1]
@@ -63,6 +64,7 @@ class CassavaDataset(Dataset):
             'reformulate': False
         },
         self.do_cutmix = do_cutmix
+        self.do_mixup = do_mixup
         self.cutmix_params = cutmix_params
 
         self.output_label = output_label
@@ -158,10 +160,6 @@ class CassavaDataset(Dataset):
                 img = lam * img + (1 - lam) * mix_img
 
                 target = lam * target + (1. - lam) * self.labels[mix_ix]
-
-            # print('-', img.sum())
-            # print(target)
-            # assert False
 
         # do label smoothing
         # print(type(img), type(target))
