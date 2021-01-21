@@ -1,4 +1,3 @@
-from fmix import sample_mask, make_low_freq_image, binarise_mask
 import sys
 import os
 import numpy as np
@@ -9,7 +8,7 @@ from torch.utils.data import Dataset
 
 sys.path.append('../../../FMix_master')
 sys.path.append('FMix_master')
-
+from fmix import sample_mask, make_low_freq_image, binarise_mask
 
 def get_img(path):
     im_bgr = cv2.imread(path)
@@ -55,6 +54,7 @@ class CassavaDataset(Dataset):
         self.transforms = transforms
         self.data_root = data_root
         self.do_fmix = do_fmix
+        self.do_mixup = do_mixup
         self.fmix_params = {
             'alpha': 1.,
             'decay_power': 3.,

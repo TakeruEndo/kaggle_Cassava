@@ -58,7 +58,7 @@ def prepare_dataloader(cfg, df, trn_idx, val_idx, revise=False, data_root='../in
     else:
         train_ds = CassavaDataset(
             cfg, train_, data_root, transforms=get_train_transforms(cfg), output_label=True,
-            one_hot_label=False, do_fmix=False, do_cutmix=False, do_mixup=True)
+            one_hot_label=False, do_fmix=False, do_cutmix=False, do_mixup=False)
         valid_ds = CassavaDataset(
             cfg, valid_, data_root, transforms=get_valid_transforms(cfg), output_label=True)
 
@@ -240,8 +240,8 @@ def main(cfg):
             base_optimizer = torch.optim.SGD
             optimizer = SAM(model.parameters(), base_optimizer, rho=0.05, lr=0.1, momentum=0.9, weight_decay=0.0005)
 
-        loss_tr = select_loss(cfg.default.loss_fn).to(device)  # MyCrossEntropyLoss().to(device)
-        loss_fn = select_loss(cfg.default.loss_fn).to(device)
+        loss_tr = select_loss(cfg).to(device)  # MyCrossEntropyLoss().to(device)
+        loss_fn = select_loss(cfg).to(device)
 
         best_score = 0.
         for epoch in range(cfg.default.epochs):
@@ -259,30 +259,20 @@ def main(cfg):
                 torch.save({'model': model.state_dict(), 'preds': valid_preds}, f'{cfg.default.model_arch}_fold_{fold}_best.pth')
             torch.save(model.state_dict(), f'{cfg.default.model_arch}_fold_{fold}_{epoch}')
 
-        check_point = torch.load(f'{cfg.default.model_arch}_fold{fold}_best.pth')
+        check_point = torch.load(f'{cfg.default.model_arch}_fold_{fold}_best.pth')
         _oof_df = check_point['preds']
         oof_labels[val_idx] = _oof_df
         logger.info(f"========== fold: {fold} result ==========")
         score = get_score(valid_labels, _oof_df)
         logger.info(f'Score - Accuracy: {score}')
 
-        del model, optimizer, train_loader, val_loader, scaler, scheduler
-        torch.cuda.empty_cache()
+        del train_loader, val_loader
         
         if True:
             logger.info(f"========== fold: {fold} Revised training ==========")
 
             train_loader, val_loader = prepare_dataloader(
                 cfg, train, trn_idx, val_idx, revise=True, data_root=cfg.common.img_path)
-
-            model = select_model(cfg.default.model_arch, train.label.nunique())
-            model.load_state_dict(torch.load(f'{cfg.default.model_arch}_fold_{fold}_best.pth'))
-            model = model.to(device)
-            scaler = GradScaler()
-            optimizer = torch.optim.Adam(
-                model.parameters(), lr=cfg.shd_para.lr, weight_decay=cfg.default.weight_decay)
-
-            scheduler = get_scheduler(cfg, optimizer)
 
             for epoch in range(cfg.default.re_epochs):
                 train_loss = train_fn(
@@ -298,13 +288,6 @@ def main(cfg):
                     logger.info(f'Epoch {epoch+1} - Save Best Score: {best_score:.4f} Model')
                     torch.save({'model': model.state_dict(), 'preds': valid_preds}, f'{cfg.default.model_arch}_revised_fold_{fold}_best.pth')
                 torch.save(model.state_dict(), f'{cfg.default.model_arch}_revised_fold_{fold}_{epoch}')
-
-            check_point = torch.load(f'{cfg.default.model_arch}_revised_fold_{fold}_best.pth')
-            _oof_df = check_point['preds']
-            oof_labels[val_idx] = _oof_df
-            logger.info(f"========== fold: {fold} result ==========")
-            score = get_score(valid_labels, _oof_df)
-            logger.info(f'Score - Accuracy: {score}')
 
             del model, optimizer, train_loader, val_loader, scaler, scheduler
             torch.cuda.empty_cache()

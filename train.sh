@@ -78,20 +78,33 @@
 # python train.py \
 # default.model_arch='tf_efficientnet_b3_ns' \
 # default.img_size=600
+python train.py \
+default.model_arch='resnext50_32x4d' \
+default.loss_fn='BiTemperedLogisticLoss' \
+default.img_size=512 \
+
+python train.py \
+default.model_arch='resnext50_32x4d' \
+default.loss_fn='LabelSmoothingLoss' \
+default.img_size=512 \
 
 python train.py \
 default.model_arch='tf_efficientnet_b4_ns' \
-default.loss_fn='LabelSmoothingLoss' \
 default.img_size=600
 
 python train.py \
 default.model_arch='tf_efficientnet_b4_ns' \
-default.loss_fn='LabelSmoothingLoss' \
-default.img_size=600 \
-shd_para.scheduler='CosineAnnealingLR'
+default.loss_fn='BiTemperedLogisticLoss' \
+default.img_size=600
 
-python train.py \
-default.model_arch='tf_efficientnet_b4_ns' \
-default.loss_fn='LabelSmoothingLoss' \
-default.img_size=600 \
-default.da_version=3
+# python train.py \
+# default.model_arch='tf_efficientnet_b4_ns' \
+# default.loss_fn='LabelSmoothingLoss' \
+# default.img_size=600 \
+# shd_para.scheduler='CosineAnnealingLR'
+
+# python train.py \
+# default.model_arch='tf_efficientnet_b4_ns' \
+# default.loss_fn='LabelSmoothingLoss' \
+# default.img_size=600 \
+# default.da_version=3

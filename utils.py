@@ -62,7 +62,8 @@ def select_model(model_name, n_class):
     return model
 
 
-def select_loss(loss_name):
+def select_loss(cfg):
+    loss_name = cfg.default.loss_fn
     if loss_name == 'CrossEntropyLoss':
         return nn.CrossEntropyLoss()
     elif loss_name == 'FocalCosineLoss':
@@ -73,6 +74,8 @@ def select_loss(loss_name):
         return TaylorCrossEntropyLoss()
     elif loss_name == 'LabelSmoothingLoss':
         return LabelSmoothingLoss()
+    elif loss_name == 'BiTemperedLogisticLoss':
+        return BiTemperedLogisticLoss(cfg.default.t1, cfg.default.t2, cfg.default.smoothing)
     else:
         print('Loss name is incorrect')
         sys.exit()

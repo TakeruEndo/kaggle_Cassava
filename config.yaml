@@ -17,14 +17,17 @@ default:
   loss_fn: 'CrossEntropyLoss'
   optimizer: 'Normal'  
   img_size: 512
-  epochs: 11
+  epochs: 10
   re_epochs: 3
-  train_bs: 16
-  valid_bs: 16
+  train_bs: 8
+  valid_bs: 8
   weight_decay: 1e-6
   num_workers: 4
   accum_iter: 2 # suppoprt to do batch accumulation for backprop with effectively larger batch size
   verbose_step: 1
+  t1: 0.3
+  t2: 1.0
+  smoothing: 0.05
 shd_para:
   scheduler: 'CosineAnnealingWarmRestarts'
   factor: 0.2 # ReduceLROnPlateau
