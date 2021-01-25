@@ -13,9 +13,21 @@ from fmix import sample_mask, make_low_freq_image, binarise_mask
 
 def get_img(path):
     im_bgr = cv2.imread(path)
-    im_rgb = im_bgr[:, :, ::-1]
-    # print(im_rgb)
-    return im_rgb
+    im_rgb = cv2.cvtColor(im_bgr, cv2.COLOR_BGR2RGB)
+    image = cut_color(im_rgb, [105, 0, 0], [255, 255, 255])
+    image = cut_color(image, [0, 0, 0], [20, 255, 255])
+    return image
+
+
+def cut_color(image, min_, max_):
+    image_hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    color_min = np.array(min_, np.uint8)
+    color_max = np.array(max_, np.uint8)
+    mask = cv2.inRange(image_hsv, color_min, color_max)
+    mask = cv2.bitwise_not(mask)
+    mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2RGB)
+    masked_img = cv2.bitwise_and(image, mask)
+    return masked_img
 
 
 def rand_bbox(size, lam):
