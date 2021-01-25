@@ -10,6 +10,7 @@
 | tf_efficientnet_b4_ns | 512        | CrossEntropy         | adam      | ConsAnne | 2        | 0.3178          | 0.89393    |
 | tf_efficientnet_b4_ns | 600        | LabelSmmothingLoss   | adam      | ConsAnne | 1        | 0.3100          | 0.89860    |
 | tf_efficientnet_b4_ns | 600        | LabelSmmothingLoss   | adam      | CosineAnnealingLR | 1        | 0.3085          | 0.89579    |
+| tf_efficientnet_b4_ns | 600        | BiTemperedLogisiticLoss   | adam      | ConsAnne | 1        | 0.0954         | 0.89533    |
 | tf_efficientnet_b5_ns | 512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3103          | 0.89700    |
 | tf_efficientnet_b5_ns | 600        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3103          | 0.89603    |
 | tf_efficientnet_b5_ns | 512        | LabelSmmothingLoss   | adam      | ConsAnne | 1        | 0.3370          | 0.89860    |
@@ -19,11 +20,19 @@
 | tf_efficientnet_b6_ns | 528        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3294          | 0.88902    |
 | tf_mixnet_s           | 512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3383          | 0.88505    |
 | vit_base_patch16_38   | 384        | CrossEntropy         | adam      | ConsAnne | 1        | 0.7168          | 0.73808    |
+| deit_base_patch_16_224   | 224      | CrossEntropy         | adam      | ConsAnne | 1        | 0.9590          | 0.6596    |
+| RepVGG-A1   | 512       | CrossEntropy         | adam      | ConsAnne | 1        |  0.3608    | 0.88879          |
+| RepVGG-B1g2   | 512       | CrossEntropy         | adam      | ConsAnne | 1        | 0.3555    |0.89533  (30epoch)     | 
+| resnext50_32x4d | 512 | BiTemperedLogisiticLoss | adam | ConsAnne | 1        |  0.1045    |0.88879 (10epoch)   |
+| resnext50_32x4d | 512 | LabelSmoothingLoss | adam | ConsAnne | 1        | 0.3539    |0.88949 (10epoch)   | 
+| resnext50_32x4d | 512 | CrossEntropy | adam | ConsAnne | 1        | 0.3579   |0.888318 (9epoch)   | 
+
+
 
 ## TODO:
 - [ ] Pseud label learning
 - [ ] [Meta Pseud Label](https://github.com/TakeruEndo/paper-survey/issues/65)
-- [ ] Focal_cosine loss
+- [x] Focal_cosine loss
   - [discussion](https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271)
 
 
