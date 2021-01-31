@@ -233,8 +233,12 @@ def create_RepVGG_B1g4(deploy=False, pretrained=True):
 
 
 def create_RepVGG_B2(deploy=False, pretrained=True):
-    return RepVGG(num_blocks=[4, 6, 16, 1], num_classes=1000,
-                  width_multiplier=[2.5, 2.5, 2.5, 5], override_groups_map=None, deploy=deploy)
+    model = RepVGG(num_blocks=[4, 6, 16, 1], num_classes=1000,
+            width_multiplier=[2.5, 2.5, 2.5, 5], override_groups_map=None, deploy=deploy)
+    if pretrained:
+        model.load_state_dict(torch.load('../../../RepVGG/weight/RepVGG-B1g4-train.pth'))
+    model.linear = nn.Linear(int(512 * model.width_multiplier[3]), 5)
+    return model     
 
 def create_RepVGG_B2g2(deploy=False, pretrained=True):
     return RepVGG(num_blocks=[4, 6, 16, 1], num_classes=1000,

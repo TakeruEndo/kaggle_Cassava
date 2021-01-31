@@ -40,7 +40,7 @@ from omegaconf import DictConfig, OmegaConf
 
 from dataset import CassavaDataset
 from transforms.transform import get_train_transforms, get_valid_transforms, get_inference_transforms
-from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score, select_loss
+from utils import seed_everything, init_logger, select_model, AverageMeter, get_scheduler, get_score, select_loss, get_optimizer
 from optimizer import SAM
 
 
@@ -229,8 +229,6 @@ def main(cfg):
         logger.info(cfg.default.model_arch)
         model = select_model(cfg, cfg.default.model_arch, train.label.nunique()).to(device)
         scaler = GradScaler()
-        optimizer = torch.optim.Adam(
-            model.parameters(), lr=cfg.shd_para.lr, weight_decay=cfg.default.weight_decay)
 
         scheduler = get_scheduler(cfg, optimizer)
         # ---------------
@@ -239,6 +237,8 @@ def main(cfg):
         if cfg.default.optimizer == 'SAM':
             base_optimizer = torch.optim.SGD
             optimizer = SAM(model.parameters(), base_optimizer, rho=0.05, lr=0.1, momentum=0.9, weight_decay=0.0005)
+        else:
+            optimizer = get_optimizer(cfg, model.parameters())
 
         loss_tr = select_loss(cfg).to(device)  # MyCrossEntropyLoss().to(device)
         loss_fn = select_loss(cfg).to(device)
