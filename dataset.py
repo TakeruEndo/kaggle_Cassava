@@ -9,14 +9,13 @@ from torch.utils.data import Dataset
 sys.path.append('../../../FMix_master')
 sys.path.append('FMix_master')
 from fmix import sample_mask, make_low_freq_image, binarise_mask
+from transforms import transform
 
 
 def get_img(path):
     im_bgr = cv2.imread(path)
     im_rgb = cv2.cvtColor(im_bgr, cv2.COLOR_BGR2RGB)
-    image = cut_color(im_rgb, [105, 0, 0], [255, 255, 255])
-    image = cut_color(image, [0, 0, 0], [20, 255, 255])
-    return image
+    return im_rgb
 
 
 def cut_color(image, min_, max_):
@@ -49,7 +48,7 @@ def rand_bbox(size, lam):
 
 
 class CassavaDataset(Dataset):
-    def __init__(self, cfg, df, data_root,
+    def __init__(self, cfg, type_, df, data_root,
                  transforms=None,
                  output_label=True,
                  one_hot_label=False,
@@ -63,8 +62,10 @@ class CassavaDataset(Dataset):
 
         super().__init__()
         self.cfg = cfg
+        self.type_ = type_
         self.df = df.reset_index(drop=True).copy()
         self.transforms = transforms
+        self.except_transform = transform.get_except_transforms(cfg)
         self.data_root = data_root
         self.do_fmix = do_fmix
         self.do_mixup = do_mixup
@@ -74,11 +75,10 @@ class CassavaDataset(Dataset):
             'shape': (self.cfg.default.img_size, self.cfg.default.img_size),
             'max_soft': True,
             'reformulate': False
-        },
+        }
         self.do_cutmix = do_cutmix
         self.do_mixup = do_mixup
         self.cutmix_params = cutmix_params
-
         self.output_label = output_label
         self.one_hot_label = one_hot_label
 
@@ -103,15 +103,17 @@ class CassavaDataset(Dataset):
                                      self.df.loc[index]['image_id']))
 
         if self.transforms:
-            img = self.transforms(image=img)['image']
+            try:
+                img = self.transforms(image=img)['image']
+            except:
+                img = self.except_transform(image=img)['image']
         
         random_num = np.random.uniform(0., 1., size=1)[0]
 
-        if self.do_fmix and random_num > 0.5:
+        if self.cfg.da.do_fmix and random_num > 0.25 and random_num < 0.50 and self.type_ == 'train':
             with torch.no_grad():
                 # lam, mask = sample_mask(**self.fmix_params)
-                lam = np.clip(np.random.beta(
-                    self.fmix_params['alpha'], self.fmix_params['alpha']), 0.6, 0.7)
+                lam = np.clip(np.random.beta(self.fmix_params['alpha'], self.fmix_params['alpha']), 0.6, 0.7)
 
                 # Make mask, get mean / std
                 mask = make_low_freq_image(
@@ -124,7 +126,10 @@ class CassavaDataset(Dataset):
                     "{}/{}".format(self.data_root, self.df.iloc[fmix_ix]['image_id']))
 
                 if self.transforms:
-                    fmix_img = self.transforms(image=fmix_img)['image']
+                    try:
+                        fmix_img = self.transforms(image=fmix_img)['image']
+                    except:
+                        fmix_img = self.except_transform(image=fmix_img)['image']                    
 
                 mask_torch = torch.from_numpy(mask)
 
@@ -138,14 +143,17 @@ class CassavaDataset(Dataset):
                 target = rate * target + (1. - rate) * self.labels[fmix_ix]
                 # print(target, mask, img)
                 # assert False
-        if self.do_cutmix and random_num > 0.75 and random_num < 1.0:
+        if self.cfg.da.do_cutmix and random_num > 0.75 and random_num < 1.0 and self.type_ == 'train':
             # print(img.sum(), img.shape)
             with torch.no_grad():
                 cmix_ix = np.random.choice(self.df.index, size=1)[0]
                 cmix_img = get_img(
                     "{}/{}".format(self.data_root, self.df.iloc[cmix_ix]['image_id']))
                 if self.transforms:
-                    cmix_img = self.transforms(image=cmix_img)['image']
+                    try:
+                        cmix_img = self.transforms(image=cmix_img)['image']
+                    except:
+                        cmix_img = self.except_transform(image=cmix_img)['image']                      
 
                 lam = np.clip(np.random.beta(
                     self.cutmix_params['alpha'], self.cutmix_params['alpha']), 0.3, 0.4)
@@ -157,7 +165,7 @@ class CassavaDataset(Dataset):
                 rate = 1 - ((bbx2 - bbx1) * (bby2 - bby1) /
                             (self.cfg.default.img_size * self.cfg.default.img_size))
                 target = rate * target + (1. - rate) * self.labels[cmix_ix]
-        if self.do_mixup and random_num > 0.50 and random_num < 0.75:
+        if self.cfg.da.do_mixup and random_num > 0.50 and random_num < 0.75 and self.type_ == 'train':
             """
             Reference: https://github.com/karaage0703/pytorch-example/blob/master/pytorch_data_preprocessing.ipynb
             """
@@ -166,7 +174,11 @@ class CassavaDataset(Dataset):
                 mix_img = get_img(
                     "{}/{}".format(self.data_root, self.df.iloc[mix_ix]['image_id']))
                 if self.transforms:
-                    mix_img = self.transforms(image=mix_img)['image']
+                    try:
+                        mix_img = self.transforms(image=mix_img)['image']
+                    except:
+                        mix_img = self.except_transform(image=mix_img)['image']                      
+                    
 
                 lam = np.random.beta(1.0, 1.0)
                 img = lam * img + (1 - lam) * mix_img

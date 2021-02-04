@@ -2,10 +2,10 @@ hydra:
   run:
     dir: ./outputs/${default.model_arch}/${now:%Y-%m-%d-%H-%M}
 common:
-  train_path: '../../../input/train.csv'
+  train_path: '../../../input/merged.csv'
   test_path: '../../../input/test.csv'
   submit_path: '../../../input/sample_submission.csv'
-  img_path: '../../../input/train_images'
+  img_path: '../../../input/train'
   pseud_csv_path: '../../../input/pseud_test.csv'
   pseud_path: '../../../input/pseud_images'
   device: 'GPU'
@@ -36,7 +36,11 @@ shd_para:
   T_max: 10 # CosineAnnealingLR
   T_0: 10 # CosineAnnealingWarmRestarts
   lr: 1e-4
-  min_lr: 1e-6  
+  min_lr: 1e-6
+da:
+  do_fmix: False
+  do_cutmix: False
+  do_mixup: False
 inf:
   fold_num: 5
   seed: 719

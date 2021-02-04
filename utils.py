@@ -3,7 +3,6 @@ import sys
 import random
 from logging import getLogger, INFO, FileHandler, Formatter, StreamHandler
 
-from adamp import AdamP
 import numpy as np
 from sklearn.metrics import accuracy_score
 import torch
@@ -99,15 +98,6 @@ def get_scheduler(cfg, optimizer):
         print('scheduler name is not collect')
         sys.exit()
     return scheduler
-
-
-def get_optimizer(cfg, parameters):
-    if cfg.default.optmizer == 'adam':
-        optimizer = torch.optim.Adam(
-            parameters, lr=cfg.shd_para.lr, weight_decay=cfg.default.weight_decay)
-    elif cfg.default.optimizer == 'adamp':
-        optimizer = AdamP(parameters, lr=cfg.shd_para.lr, weight_decay=cfg.default.weight_decay)
-    return optimizer
 
 
 class AverageMeter(object):
