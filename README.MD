@@ -8,13 +8,8 @@
 | RepVGG-B1g4 | 2020        |  mixup | 512       | CrossEntropy         | adam      | ConsAnne | 1        | 0.3519          | 0.8887    |  ---- |
 | resnext50_32x4d | 2019 + 2020 | fmix | 512    | CrossEntropy | adam | ConsAnne | 1        |  0.3823    |0.88743356 (13epoch)   | 0.891 |
 | resnext50_32x4d | 2020 | mixup | 512    | CrossEntropy | adam | ConsAnne | 1        |  0.3547    |0.88995 (20epoch)   | ---- |
-
 | tf_efficientnet_b4_ns | 2019 + 2020 | fmix | 512        | CrossEntropy | adam | ConsAnne | 1        |   0.3377    |0.888572513287 (6epoch)   | ---- |
-| tf_efficientnet_b4_ns | 2020 | mixup | 512        | CrossEntropy | adam | ConsAnne | 1        |   0.3318    |0.8892523364 (10epoch)   | ---- |
-
-| tf_efficientnet_b4_ns | 2019 + 2020 | fmix | 512        | CrossEntropy | adam | ConsAnne | 1        |   0.3318    |0.8892523364 (10epoch)   | ---- |
 | tf_efficientnet_b4_ns | 2020 | mixup | 512        | CrossEntropy | adamp | ConsAnne | 1        |   0.3346    | 0.89205607 (9epoch)   | ---- |
-
 | tf_efficientnet_b5_ns | 2019 + 2020 | fmix | 512        | CrossEntropy | adam | ConsAnne | 1        |   0.3423    |0.890280941 (8epoch)   | 0.8999 |
 | tf_efficientnet_b5_ns | 2020 | mixup | 512        | CrossEntropy | adamp | ConsAnne | 1        |  0.3318   |0.8936915 (6epoch)   | ---  |
 | tf_efficientnet_b5_ns | 2020 | mixup | 512        | CrossEntropy | adamp | ConsAnne | 1        |   0.3318    |0.89252 (5epoch)   | ---- |
