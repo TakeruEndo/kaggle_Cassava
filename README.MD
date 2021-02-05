@@ -3,7 +3,7 @@
 ## 実験結果
 ### phase2
 | model_name            | Dataset | mix_da | image_size | loss                 | optimizer | schduler | data_aug | best_score_loss | best_score | fold0 score |
-| --------------------- | ---------- | -------------------- | --------- | -------- | -------- | --------------- | ---------- | ---- |
+| --------------------- | ---------- | -------------------- | --------- | -------- | -------- | --------------- | ---------- | ---- |---------- | -------------------- |
 | RepVGG-B1g4   | 2019 + 2020 | fmix | 512       | CrossEntropy         | adam      | ConsAnne | 1        | 0.3563    |0.890660  (13epoch)     |   0.890 |
 | RepVGG-B1g4 | 2020        |  mixup | 512       | CrossEntropy         | adam      | ConsAnne | 1        | 0.3519          | 0.8887    |  ---- |
 | resnext50_32x4d | 2019 + 2020 | fmix | 512    | CrossEntropy | adam | ConsAnne | 1        |  0.3823    |0.88743356 (13epoch)   | 0.891 |
