@@ -1,6 +1,26 @@
 <a href="https://www.kaggle.com/c/cassava-leaf-disease-classification"><img src=https://github.com/TakeruEndo/kaggle_Cassava/blob/main/imgs/img.png></a>
 
 ## 実験結果
+### phase2
+| model_name            | Dataset | mix_da | image_size | loss                 | optimizer | schduler | data_aug | best_score_loss | best_score | fold0 score |
+| --------------------- | ---------- | -------------------- | --------- | -------- | -------- | --------------- | ---------- | ---- |
+| RepVGG-B1g4   | 2019 + 2020 | fmix | 512       | CrossEntropy         | adam      | ConsAnne | 1        | 0.3563    |0.890660  (13epoch)     |   0.890 |
+| RepVGG-B1g4 | 2020        |  mixup | 512       | CrossEntropy         | adam      | ConsAnne | 1        | 0.3519          | 0.8887    |  ---- |
+| resnext50_32x4d | 2019 + 2020 | fmix | 512    | CrossEntropy | adam | ConsAnne | 1        |  0.3823    |0.88743356 (13epoch)   | 0.891 |
+| resnext50_32x4d | 2020 | mixup | 512    | CrossEntropy | adam | ConsAnne | 1        |  0.3547    |0.88995 (20epoch)   | ---- |
+
+| tf_efficientnet_b4_ns | 2019 + 2020 | fmix | 512        | CrossEntropy | adam | ConsAnne | 1        |   0.3377    |0.888572513287 (6epoch)   | ---- |
+| tf_efficientnet_b4_ns | 2020 | mixup | 512        | CrossEntropy | adam | ConsAnne | 1        |   0.3318    |0.8892523364 (10epoch)   | ---- |
+
+| tf_efficientnet_b4_ns | 2019 + 2020 | fmix | 512        | CrossEntropy | adam | ConsAnne | 1        |   0.3318    |0.8892523364 (10epoch)   | ---- |
+| tf_efficientnet_b4_ns | 2020 | mixup | 512        | CrossEntropy | adamp | ConsAnne | 1        |   0.3346    | 0.89205607 (9epoch)   | ---- |
+
+| tf_efficientnet_b5_ns | 2019 + 2020 | fmix | 512        | CrossEntropy | adam | ConsAnne | 1        |   0.3423    |0.890280941 (8epoch)   | 0.8999 |
+| tf_efficientnet_b5_ns | 2020 | mixup | 512        | CrossEntropy | adamp | ConsAnne | 1        |  0.3318   |0.8936915 (6epoch)   | ---  |
+| tf_efficientnet_b5_ns | 2020 | mixup | 512        | CrossEntropy | adamp | ConsAnne | 1        |   0.3318    |0.89252 (5epoch)   | ---- |
+
+### phase1
+
 | model_name            | image_size | loss                 | optimizer | schduler | data_aug | best_score_loss | best_score |
 | --------------------- | ---------- | -------------------- | --------- | -------- | -------- | --------------- | ---------- |
 | tf_efficientnet_b4_ns | 512        | FocalCosineLoss      | adam      | ConsAnne | 1        | 0.1355          | 0.89276    |
