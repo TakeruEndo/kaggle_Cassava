@@ -48,8 +48,8 @@
 
 
 ## TODO:
-- [ ] Pseud label learning
-- [ ] [Meta Pseud Label](https://github.com/TakeruEndo/paper-survey/issues/65)
+- [x] Pseud label learning
+- [x] [Meta Pseud Label](https://github.com/TakeruEndo/paper-survey/issues/65)
 - [x] Focal_cosine loss
   - [discussion](https://www.kaggle.com/c/cassava-leaf-disease-classification/discussion/203271)
 
