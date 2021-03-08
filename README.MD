@@ -4,7 +4,6 @@
 🥉227/3900
 
 ## 実験結果
-### phase2
 | model_name            | Dataset | mix_da | image_size | loss                 | optimizer | schduler | data_aug | best_score_loss | best_score | fold0 score |
 | --------------------- | ---------- | -------------------- | --------- | -------- | -------- | --------------- | ---------- | ---- |---------- | -------------------- |
 | RepVGG-B1g4   | 2019 + 2020 | fmix | 512       | CrossEntropy         | adam      | ConsAnne | 1        | 0.3563    |0.890660  (13epoch)     |   0.890 |
@@ -16,35 +15,9 @@
 | tf_efficientnet_b5_ns | 2019 + 2020 | fmix | 512        | CrossEntropy | adam | ConsAnne | 1        |   0.3423    |0.890280941 (8epoch)   | 0.8999 |
 | tf_efficientnet_b5_ns | 2020 | mixup | 512        | CrossEntropy | adamp | ConsAnne | 1        |  0.3318   |0.8936915 (6epoch)   | ---  |
 | tf_efficientnet_b5_ns | 2020 | mixup | 512        | CrossEntropy | adamp | ConsAnne | 1        |   0.3318    |0.89252 (5epoch)   | ---- |
-
-### phase1
-
-| model_name            | image_size | loss                 | optimizer | schduler | data_aug | best_score_loss | best_score |
-| --------------------- | ---------- | -------------------- | --------- | -------- | -------- | --------------- | ---------- |
-| tf_efficientnet_b4_ns | 512        | FocalCosineLoss      | adam      | ConsAnne | 1        | 0.1355          | 0.89276    |
-| tf_efficientnet_b4_ns | 512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3251          | 0.89462    |
-| tf_efficientnet_b4_ns | 600        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3103          | 0.89626    |
-| tf_efficientnet_b4_ns | 512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3251          | 0.89462    |
-| tf_efficientnet_b4_ns | 512        | CrossEntropy         | adam      | ConsAnne | 2        | 0.3178          | 0.89393    |
-| tf_efficientnet_b4_ns | 600        | LabelSmmothingLoss   | adam      | ConsAnne | 1        | 0.3100          | 0.89860    |
-| tf_efficientnet_b4_ns | 600        | LabelSmmothingLoss   | adam      | CosineAnnealingLR | 1        | 0.3085          | 0.89579    |
-| tf_efficientnet_b4_ns | 600        | BiTemperedLogisiticLoss   | adam      | ConsAnne | 1        | 0.0954         | 0.89533    |
-| tf_efficientnet_b5_ns | 512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3103          | 0.89700    |
-| tf_efficientnet_b5_ns | 600        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3103          | 0.89603    |
-| tf_efficientnet_b5_ns | 512        | LabelSmmothingLoss   | adam      | ConsAnne | 1        | 0.3370          | 0.89860    |
-| tf_efficientnet_b5_ns | 512        | TaylorCrossEntropy   | adam      | ConsAnne | 1        | 0.3095          | 0.89766    |
-| tf_efficientnet_b5_ns | 512        | SymmtricCrossENtropy | adam      | ConsAnne | 1        | 0.3574          | 0.89580    |
-| tf_efficientnet_b6    | 528        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3407          | 0.89042    |
-| tf_efficientnet_b6_ns | 528        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3294          | 0.88902    |
-| tf_mixnet_s           | 512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3383          | 0.88505    |
-| vit_base_patch16_38   | 384        | CrossEntropy         | adam      | ConsAnne | 1        | 0.7168          | 0.73808    |
-| deit_base_patch_16_224   | 224      | CrossEntropy         | adam      | ConsAnne | 1        | 0.9590          | 0.6596    |
-| RepVGG-A1   | 512       | CrossEntropy         | adam      | ConsAnne | 1        |  0.3608    | 0.88879          |
-| RepVGG-B1g2   | 512       | CrossEntropy         | adam      | ConsAnne | 1        | 0.3555    |0.89533  (30epoch)     | 
-| resnext50_32x4d | 512 | BiTemperedLogisiticLoss | adam | ConsAnne | 1        |  0.1045    |0.88879 (10epoch)   |
-| resnext50_32x4d | 512 | LabelSmoothingLoss | adam | ConsAnne | 1        | 0.3539    |0.88949 (10epoch)   | 
-| resnext50_32x4d | 512 | CrossEntropy | adam | ConsAnne | 1        | 0.3579   |0.888318 (9epoch)   | 
-
+| tf_mixnet_s           | 2020 | --- |512        | CrossEntropy         | adam      | ConsAnne | 1        | 0.3383          | 0.88505    | ---  |
+| vit_base_patch16_38   | 2020 | --- |384        | CrossEntropy         | adam      | ConsAnne | 1        | 0.7168          | 0.73808    | ---  |
+| deit_base_patch_16_224   | 2020 | --- |224      | CrossEntropy         | adam      | ConsAnne | 1        | 0.9590          | 0.6596    | ---  |
 
 
 ## TODO:
